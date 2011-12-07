@@ -7,17 +7,32 @@
 extern char *iso_param_dev;
 extern struct net_device *iso_netdev;
 
+#if defined ISO_HOOK_BRIDGE
 int iso_rx_bridge_init(void);
 void iso_rx_bridge_exit(void);
+#elif defined ISO_HOOK_IPTABLES
+int iso_rx_iptables_init(void);
+void iso_rx_iptables_exit(void);
+#else
+#error "Please choose a hook method: ISO_HOOK_BRIDGE or ISO_HOOK_IPTABLES"
+#endif
 
 int iso_rx_init() {
 	printk(KERN_INFO "perfiso: Init RX path\n");
 	iso_vqs_init();
+#if defined ISO_HOOK_BRIDGE
 	return iso_rx_bridge_init();
+#elif defined ISO_HOOK_IPTABLES
+	return iso_rx_iptables_init();
+#endif
 }
 
 void iso_rx_exit() {
+#if defined ISO_HOOK_BRIDGE
 	iso_rx_bridge_exit();
+#elif defined ISO_HOOK_IPTABLES
+	iso_rx_iptables_exit();
+#endif
 	iso_vqs_exit();
 }
 

@@ -21,6 +21,9 @@ struct seq_file;
 #if defined ISO_TX_CLASS_DEV
 typedef struct net_device *iso_class_t;
 #elif defined ISO_TX_CLASS_ETHER_SRC
+#if defined ISO_HOOK_IPTABLES
+#warning "Classifying based on ethernet mac address when using iptables hook"
+#endif
 typedef struct {
 	u8 addr[ETH_ALEN];
 }iso_class_t;

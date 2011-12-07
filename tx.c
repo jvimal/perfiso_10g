@@ -8,13 +8,24 @@ extern char *iso_param_dev;
 extern struct net_device *iso_netdev;
 struct hlist_head iso_tx_bucket[ISO_MAX_TX_BUCKETS];
 
+#if defined ISO_HOOK_BRIDGE
 int iso_tx_bridge_init(void);
 void iso_tx_bridge_exit(void);
+#elif defined ISO_HOOK_IPTABLES
+int iso_tx_iptables_init(void);
+void iso_tx_iptables_exit(void);
+#else
+#error "Please choose a hook method: ISO_HOOK_BRIDGE or ISO_HOOK_IPTABLES"
+#endif
 
 int iso_tx_init() {
 	printk(KERN_INFO "perfiso: Init TX path\n");
 
+#if defined ISO_HOOK_BRIDGE
 	return iso_tx_bridge_init();
+#elif defined ISO_HOOK_IPTABLES
+	return iso_tx_iptables_init();
+#endif
 }
 
 void iso_tx_exit() {
@@ -23,7 +34,11 @@ void iso_tx_exit() {
 	struct hlist_node *node;
 	struct iso_tx_class *txc;
 
+#if defined ISO_HOOK_BRIDGE
 	iso_tx_bridge_exit();
+#elif defined ISO_HOOK_IPTABLES
+	iso_tx_iptables_exit();
+#endif
 
 	rcu_read_lock();
 
