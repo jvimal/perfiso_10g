@@ -23,14 +23,13 @@ void iso_rl_init(struct iso_rl *rl) {
 		q->tokens = 0;
 
 		spin_lock_init(&q->spinlock);
-		tasklet_init(&q->xmit_timeout, iso_rl_dequeue, (unsigned long)q);
-
-		hrtimer_init(&q->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-		q->timer.function = iso_rl_timeout;
-
 		q->cpu = i;
 		q->rl = rl;
 	}
+
+	tasklet_init(&rl->xmit_timeout, iso_rl_xmit_tasklet, (unsigned long)rl);
+	hrtimer_init(&rl->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	rl->timer.function = iso_rl_timeout;
 
 	INIT_LIST_HEAD(&rl->prealloc_list);
 	rl->txc = NULL;
@@ -42,10 +41,11 @@ void iso_rl_free(struct iso_rl *rl) {
 	  unsigned long flags;*/
 
 	for_each_possible_cpu(i) {
+		/*
 		struct iso_rl_queue *q = per_cpu_ptr(rl->queue, i);
 		hrtimer_cancel(&q->timer);
 		tasklet_kill(&q->xmit_timeout);
-
+		*/
 		/*
 		  This is causing an issue, and not sure how to fix it.
 		spin_lock_irqsave(&q->spinlock, flags);
@@ -57,6 +57,8 @@ void iso_rl_free(struct iso_rl *rl) {
 		spin_unlock_irqrestore(&q->spinlock, flags);
 		*/
 	}
+	hrtimer_cancel(&rl->timer);
+	tasklet_kill(&rl->xmit_timeout);
 	free_percpu(rl->queue);
 	kfree(rl);
 }
@@ -154,7 +156,7 @@ void iso_rl_dequeue(unsigned long _q) {
 	if(unlikely(q->tokens < q->first_pkt_size)) {
 		timeout = iso_rl_borrow_tokens(rl, q);
 		if(timeout) {
-			hrtimer_start(&q->timer, iso_rl_gettimeout(), HRTIMER_MODE_REL);
+			hrtimer_start(&rl->timer, iso_rl_gettimeout(), HRTIMER_MODE_REL);
 			return;
 		}
 	}
@@ -210,20 +212,31 @@ unlock:
 
 	spin_unlock(&q->spinlock);
 	if(timeout) {
-		hrtimer_start(&q->timer, iso_rl_gettimeout(), HRTIMER_MODE_REL);
+		hrtimer_start(&rl->timer, iso_rl_gettimeout(), HRTIMER_MODE_REL);
 	}
 }
 
 /* HARDIRQ timeout */
 enum hrtimer_restart iso_rl_timeout(struct hrtimer *timer) {
 	/* schedue xmit tasklet to go into softirq context */
-	struct iso_rl_queue *q = container_of(timer, struct iso_rl_queue, timer);
-	iso_rl_clock(q->rl);
-	tasklet_schedule(&q->xmit_timeout);
+	struct iso_rl *rl = container_of(timer, struct iso_rl, timer);
+	tasklet_schedule(&rl->xmit_timeout);
 	return HRTIMER_NORESTART;
 }
 
-int iso_rl_borrow_tokens(struct iso_rl *rl, struct iso_rl_queue *q) {
+void iso_rl_xmit_tasklet(unsigned long _rl) {
+	int cpu;
+	struct iso_rl *rl = (struct iso_rl *)_rl;
+	struct iso_rl_queue *q;
+
+	iso_rl_clock(rl);
+	for_each_online_cpu(cpu) {
+		q = per_cpu_ptr(rl->queue, cpu);
+		iso_rl_dequeue((unsigned long)q);
+	}
+}
+
+inline int iso_rl_borrow_tokens(struct iso_rl *rl, struct iso_rl_queue *q) {
 	unsigned long flags;
 	u64 borrow;
 	int timeout = 1;
@@ -242,6 +255,10 @@ int iso_rl_borrow_tokens(struct iso_rl *rl, struct iso_rl_queue *q) {
 		*/
 		timeout = 0;
 	}
+
+	/* If timer is already active, don't fire */
+	if(hrtimer_active(&rl->timer))
+		timeout = 0;
 
 	spin_unlock_irqrestore(&rl->spinlock, flags);
 	return timeout;

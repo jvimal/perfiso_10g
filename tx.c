@@ -438,21 +438,9 @@ void iso_txc_free(struct iso_tx_class *txc) {
 	}
 
 	/* Kill the default rate limiter */
-	for_each_possible_cpu(i) {
-		struct iso_rl_queue *q = per_cpu_ptr(txc->rl.queue, i);
-		hrtimer_cancel(&q->timer);
-		tasklet_kill(&q->xmit_timeout);
-		/* TODO: This caused a crash.  Dunno why! */
-		/*
-		spin_lock_irqsave(&q->spinlock, flags);
-		for(j = q->head; j != q->tail; j++) {
-			j &= ISO_MAX_QUEUE_LEN_PKT;
-			kfree_skb(q->queue[j]);
-		}
-		q->head = q->tail = 0;
-		spin_unlock_irqrestore(&q->spinlock, flags);
-		*/
-	}
+	rl = &txc->rl;
+	hrtimer_cancel(&rl->timer);
+	tasklet_kill(&rl->xmit_timeout);
 	free_percpu(txc->rl.queue);
 
 	kfree(txc);
