@@ -232,7 +232,8 @@ void iso_rl_xmit_tasklet(unsigned long _rl) {
 	iso_rl_clock(rl);
 	for_each_online_cpu(cpu) {
 		q = per_cpu_ptr(rl->queue, cpu);
-		iso_rl_dequeue((unsigned long)q);
+		if(unlikely(q->length > 0))
+			iso_rl_dequeue((unsigned long)q);
 	}
 }
 
