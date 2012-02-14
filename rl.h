@@ -67,6 +67,7 @@ struct iso_rl {
 struct iso_rl_cb {
 	spinlock_t spinlock;
 	int cpu;
+	struct completion compl;
 	struct list_head active_list;
 	struct task_struct *thread;
 };
@@ -80,7 +81,7 @@ void iso_rl_init(struct iso_rl *);
 void iso_rl_free(struct iso_rl *);
 void iso_rl_show(struct iso_rl *, struct seq_file *);
 static inline int iso_rl_should_refill(struct iso_rl *);
-void iso_rl_clock(struct iso_rl *);
+inline void iso_rl_clock(struct iso_rl *);
 enum iso_verdict iso_rl_enqueue(struct iso_rl *, struct sk_buff *, int cpu);
 void iso_rl_dequeue(unsigned long _q);
 inline int iso_rl_borrow_tokens(struct iso_rl *, struct iso_rl_queue *);

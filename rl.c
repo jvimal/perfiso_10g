@@ -18,6 +18,7 @@ int iso_rl_prep() {
 		struct iso_rl_cb *cb = per_cpu_ptr(rlcb, cpu);
 		spin_lock_init(&cb->spinlock);
 		cb->cpu = cpu;
+		init_completion(&cb->compl);
 		INIT_LIST_HEAD(&cb->active_list);
 
 		cb->thread = kthread_create(iso_rl_thread, (void *)cb, "iso_rl_thread");
@@ -88,7 +89,8 @@ int iso_rl_thread(void *_cb) {
 		local_bh_enable();
 
 		us = ISO_TOKENBUCKET_TIMEOUT_NS/1000;
-		usleep_range(us, us);
+		if(!list_empty(&cb->active_list) || wait_for_completion_timeout(&cb->compl, 100))
+			usleep_range(us, us);
 	}
 
 	return 0;
@@ -158,7 +160,7 @@ void iso_rl_show(struct iso_rl *rl, struct seq_file *s) {
 }
 
 /* This function could be called from HARDIRQ context */
-void iso_rl_clock(struct iso_rl *rl) {
+inline void iso_rl_clock(struct iso_rl *rl) {
 	unsigned long flags;
 	u64 cap, us;
 	ktime_t now;
@@ -285,6 +287,7 @@ timeout:
 	if(timeout && list_empty(&q->active_list)) {
 		struct iso_rl_cb *cb = per_cpu_ptr(rlcb, q->cpu);
 		list_add_tail(&q->active_list, &cb->active_list);
+		complete(&cb->compl);
 	}
 
 	return;
@@ -295,7 +298,9 @@ inline int iso_rl_borrow_tokens(struct iso_rl *rl, struct iso_rl_queue *q) {
 	u64 borrow;
 	int timeout = 1;
 
-	spin_lock_irqsave(&rl->spinlock, flags);
+	if(!spin_trylock_irqsave(&rl->spinlock, flags))
+		return timeout;
+
 	borrow = max(iso_rl_singleq_burst(rl), (u64)q->first_pkt_size);
 
 	if(rl->total_tokens >= borrow) {
