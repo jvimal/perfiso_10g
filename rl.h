@@ -19,6 +19,7 @@
 #include <linux/random.h>
 #include <asm/atomic.h>
 #include <linux/spinlock.h>
+#include <linux/kthread.h>
 
 #include "params.h"
 
@@ -68,17 +69,14 @@ struct iso_rl {
 /* The per-cpu control block for rate limiters */
 struct iso_rl_cb {
 	spinlock_t spinlock;
-	struct hrtimer timer;
-	struct tasklet_struct xmit_timeout;
-	struct list_head active_list;
-	ktime_t last;
-	u64 avg_us;
 	int cpu;
+	struct list_head active_list;
+	struct task_struct *thread;
 };
 
 int iso_rl_prep(void);
 void iso_rl_exit(void);
-void iso_rl_xmit_tasklet(unsigned long _cb);
+int iso_rl_thread(void *_cb);
 extern struct iso_rl_cb __percpu *rlcb;
 
 void iso_rl_init(struct iso_rl *);
@@ -88,7 +86,6 @@ static inline int iso_rl_should_refill(struct iso_rl *);
 void iso_rl_clock(struct iso_rl *);
 enum iso_verdict iso_rl_enqueue(struct iso_rl *, struct sk_buff *, int cpu);
 void iso_rl_dequeue(unsigned long _q);
-enum hrtimer_restart iso_rl_timeout(struct hrtimer *);
 inline int iso_rl_borrow_tokens(struct iso_rl *, struct iso_rl_queue *);
 static inline ktime_t iso_rl_gettimeout(void);
 static inline u64 iso_rl_singleq_burst(struct iso_rl *);
