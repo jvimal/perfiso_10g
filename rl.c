@@ -82,9 +82,10 @@ int iso_rl_thread(void *_cb) {
 			if(qnext == first || count++ > budget)
 				break;
 
-			iso_rl_clock(q->rl);
-			list_del_init(&q->active_list);
-			iso_rl_dequeue((unsigned long)q);
+			if(iso_rl_clock(q->rl)) {
+				list_del_init(&q->active_list);
+				iso_rl_dequeue((unsigned long)q);
+			}
 		}
 		local_bh_enable();
 
@@ -160,16 +161,16 @@ void iso_rl_show(struct iso_rl *rl, struct seq_file *s) {
 }
 
 /* This function could be called from HARDIRQ context */
-inline void iso_rl_clock(struct iso_rl *rl) {
+inline int iso_rl_clock(struct iso_rl *rl) {
 	unsigned long flags;
 	u64 cap, us;
 	ktime_t now;
 
 	if(!iso_rl_should_refill(rl))
-		return;
+		return 0;
 
 	if(!spin_trylock_irqsave(&rl->spinlock, flags))
-		return;
+		return 0;
 
 	now = ktime_get();
 	us = ktime_us_delta(now, rl->last_update_time);
@@ -182,6 +183,7 @@ inline void iso_rl_clock(struct iso_rl *rl) {
 	rl->last_update_time = now;
 
 	spin_unlock_irqrestore(&rl->spinlock, flags);
+	return 1;
 }
 
 enum iso_verdict iso_rl_enqueue(struct iso_rl *rl, struct sk_buff *pkt, int cpu) {
