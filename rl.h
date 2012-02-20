@@ -63,6 +63,20 @@ struct iso_rl {
 	struct iso_tx_class *txc;
 };
 
+struct iso_rl_class {
+	u32 rate;
+	u8 leaf;
+	spinlock_t spinlock;
+
+	struct list_head queue;
+	u64 total_tokens;
+	u64 accum_xmit;
+	ktime_t last_update_time;
+	struct hlist_node hash_node;
+	struct list_head prealloc_list;
+	struct iso_rl_class *parent;
+};
+
 /* The per-cpu control block for rate limiters */
 struct iso_rl_cb {
 	spinlock_t spinlock;
