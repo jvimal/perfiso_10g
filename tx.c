@@ -21,8 +21,6 @@ int iso_tx_init() {
 	INIT_LIST_HEAD(&txc_list);
 	txc_last_update_time = ktime_get();
 	spin_lock_init(&txc_spinlock);
-	if(iso_rl_prep())
-		return -1;
 
 	txc_total_weight = 0;
 	return iso_tx_hook_init();
@@ -34,8 +32,6 @@ void iso_tx_exit() {
 	struct hlist_node *node, *nextnode;
 	struct iso_tx_class *txc;
 
-	iso_rl_exit();
-
 	for(i = 0; i < ISO_MAX_TX_BUCKETS; i++) {
 		head = &iso_tx_bucket[i];
 		hlist_for_each_entry_safe(txc, nextnode, node, head, hash_node) {
@@ -43,8 +39,6 @@ void iso_tx_exit() {
 			iso_txc_free(txc);
 		}
 	}
-
-	free_percpu(rlcb);
 }
 
 inline void iso_txc_tick() {
@@ -72,7 +66,7 @@ inline void iso_txc_tick() {
 			iso_rl_accum(rl);
 			min_xmit = ((txc->vrate * dt) >> 3);
 
-			txc->active = (rl->accum_enqueued > 3000) ||
+			txc->active = (rl->bytes_enqueued > 3000) ||
 				((rl->accum_xmit - last_xmit) > min_xmit);
 
 			if(txc->active)
@@ -115,7 +109,7 @@ void iso_txc_show(struct iso_tx_class *txc, struct seq_file *s) {
 	}
 
 	seq_printf(s, "txc class %s   assoc vq %s   freelist %d\n", buff, vqc, txc->freelist_count);
-	seq_printf(s, "txc rl   xmit %llu   queued %llu\n", txc->rl.accum_xmit, txc->rl.accum_enqueued);
+	seq_printf(s, "txc rl   xmit %llu\n", txc->rl.accum_xmit);
 	iso_rl_show(&txc->rl, s);
 	seq_printf(s, "\n");
 
@@ -149,7 +143,7 @@ enum iso_verdict iso_tx(struct sk_buff *skb, const struct net_device *out)
 	struct iso_tx_class *txc;
 	struct iso_per_dest_state *state;
 	struct iso_rl *rl;
-	struct iso_rl_queue *q;
+	struct iso_rl_local *l;
 	struct iso_vq *vq;
 	enum iso_verdict verdict = ISO_VERDICT_PASS;
 	int cpu = smp_processor_id();
@@ -170,18 +164,18 @@ enum iso_verdict iso_tx(struct sk_buff *skb, const struct net_device *out)
 	}
 
 	rl = state->rl;
-	vq = txc->vq;
+	l = per_cpu_ptr(rl->local, cpu);
 
-	/* Enqueue in RL */
-	verdict = iso_rl_enqueue(rl, skb, cpu);
-	q = per_cpu_ptr(rl->queue, cpu);
+	vq = txc->vq;
 
 	if(likely(vq)) {
 		if(iso_vq_over_limits(vq))
-			q->feedback_backlog++;
+			l->feedback_backlog++;
 	}
 
-	iso_rl_dequeue((unsigned long)q);
+	/* RL takes over */
+	verdict = iso_rl_xmit(rl, skb);
+
  accept:
 	rcu_read_unlock();
 	return verdict;
@@ -389,6 +383,7 @@ void iso_txc_prealloc(struct iso_tx_class *txc, int num) {
 		iso_state_init(state);
 		iso_rl_init(rl);
 		rl->txc = txc;
+		rl->parent = &txc->rl;
 
 		spin_lock_irqsave(&txc->writelock, flags);
 		txc->freelist_count++;
@@ -444,7 +439,7 @@ void iso_txc_free(struct iso_tx_class *txc) {
 		atomic_dec(&txc->vq->refcnt);
 	}
 
-	free_percpu(txc->rl.queue);
+	free_percpu(txc->rl.local);
 	kfree(txc);
 }
 

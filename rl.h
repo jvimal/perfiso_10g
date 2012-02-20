@@ -28,6 +28,7 @@ enum iso_verdict {
 	ISO_VERDICT_PASS,
 };
 
+#if 0
 struct iso_rl_queue {
 	struct sk_buff_head list;
 	int first_pkt_size;
@@ -62,46 +63,55 @@ struct iso_rl {
 
 	struct iso_tx_class *txc;
 };
+#endif
 
-struct iso_rl_class {
+/* Local per cpu structs */
+struct iso_rl_local {
+	u64 bytes_xmit;
+	u64 feedback_backlog;
+	u32 tokens;
+	int cpu;
+	struct iso_rl *rl;
+};
+
+struct iso_rl {
 	u32 rate;
-	u8 leaf;
+	u32 leaf;
+
+	u32 first_pkt_size;
+	u32 bytes_enqueued;
+	struct sk_buff_head queue;
 	spinlock_t spinlock;
 
-	struct list_head queue;
 	u64 total_tokens;
 	u64 accum_xmit;
 	ktime_t last_update_time;
 	struct hlist_node hash_node;
 	struct list_head prealloc_list;
-	struct iso_rl_class *parent;
-};
-
-/* The per-cpu control block for rate limiters */
-struct iso_rl_cb {
-	spinlock_t spinlock;
 	struct hrtimer timer;
-	struct tasklet_struct xmit_timeout;
-	struct list_head active_list;
-	ktime_t last;
-	u64 avg_us;
-	int cpu;
+	struct tasklet_struct xmit_tasklet;
+
+	struct iso_rl *parent;
+	struct iso_rl_local *local;
+	struct iso_tx_class *txc;
+	__le32 ip;
 };
 
-int iso_rl_prep(void);
-void iso_rl_exit(void);
 void iso_rl_xmit_tasklet(unsigned long _cb);
-extern struct iso_rl_cb __percpu *rlcb;
 
 void iso_rl_init(struct iso_rl *);
 void iso_rl_free(struct iso_rl *);
 void iso_rl_show(struct iso_rl *, struct seq_file *);
 static inline int iso_rl_should_refill(struct iso_rl *);
 inline void iso_rl_clock(struct iso_rl *);
-enum iso_verdict iso_rl_enqueue(struct iso_rl *, struct sk_buff *, int cpu);
-void iso_rl_dequeue(unsigned long _q);
+
+inline enum iso_verdict iso_rl_enqueue(struct iso_rl *, struct sk_buff *);
+enum iso_verdict iso_rl_xmit(struct iso_rl *, struct sk_buff *);
+inline u64 iso_rl_borrow(struct iso_rl *, u64 minimum);
+void iso_rl_dequeue(unsigned long _rl);
 enum hrtimer_restart iso_rl_timeout(struct hrtimer *);
-inline int iso_rl_borrow_tokens(struct iso_rl *, struct iso_rl_queue *);
+
+inline u64 iso_rl_borrow(struct iso_rl *, u64 minimum);
 static inline ktime_t iso_rl_gettimeout(void);
 static inline u64 iso_rl_singleq_burst(struct iso_rl *);
 
@@ -144,7 +154,6 @@ static inline ktime_t iso_rl_gettimeout() {
 	return ktime_set(0, ISO_TOKENBUCKET_TIMEOUT_NS);
 }
 
-
 static inline u64 iso_rl_singleq_burst(struct iso_rl *rl) {
 	return ((rl->rate * ISO_MAX_BURST_TIME_US) >> 3) / ISO_BURST_FACTOR;
 }
@@ -157,19 +166,17 @@ static inline int iso_rl_should_refill(struct iso_rl *rl) {
 }
 
 static inline void iso_rl_accum(struct iso_rl *rl) {
-	u64 xmit, queued;
+	u64 xmit;
 	int i;
-	struct iso_rl_queue *q;
+	struct iso_rl_local *l;
 
-	xmit = queued = 0;
+	xmit = 0;
 	for_each_online_cpu(i) {
-		q = per_cpu_ptr(rl->queue, i);
-		xmit += q->bytes_xmit;
-		queued += q->bytes_enqueued;
+		l = per_cpu_ptr(rl->local, i);
+		xmit += l->bytes_xmit;
 	}
 
 	rl->accum_xmit = xmit;
-	rl->accum_enqueued = queued;
 }
 
 #endif /* __RL_H__ */
