@@ -28,6 +28,7 @@ void iso_rl_init(struct iso_rl *rl) {
 		l->bytes_xmit = 0;
 
 		l->feedback_backlog = 0;
+		l->token_pool = NULL;
 		l->tokens = 0;
 
 		l->cpu = i;

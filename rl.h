@@ -69,6 +69,7 @@ struct iso_rl {
 struct iso_rl_local {
 	u64 bytes_xmit;
 	u64 feedback_backlog;
+	u32 *token_pool;
 	u32 tokens;
 	int cpu;
 	struct iso_rl *rl;

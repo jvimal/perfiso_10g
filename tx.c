@@ -355,7 +355,7 @@ void iso_state_init(struct iso_per_dest_state *state) {
 }
 
 void iso_txc_prealloc(struct iso_tx_class *txc, int num) {
-	int i;
+	int i, cpu;
 	struct iso_per_dest_state *state;
 	struct iso_rl *rl;
 	unsigned long flags;
@@ -384,6 +384,13 @@ void iso_txc_prealloc(struct iso_tx_class *txc, int num) {
 		iso_rl_init(rl);
 		rl->txc = txc;
 		rl->parent = &txc->rl;
+
+		for_each_possible_cpu(cpu) {
+			struct iso_rl_local *leaf, *root;
+			leaf = per_cpu_ptr(rl->local, cpu);
+			root = per_cpu_ptr(txc->rl.local, cpu);
+			leaf->token_pool = &root->tokens;
+		}
 
 		spin_lock_irqsave(&txc->writelock, flags);
 		txc->freelist_count++;
