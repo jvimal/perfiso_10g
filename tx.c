@@ -63,6 +63,7 @@ inline void iso_txc_tick() {
 		for_each_txc(txc) {
 			rl = &txc->rl;
 			last_xmit = rl->accum_xmit;
+			iso_rl_clock(rl);
 			iso_rl_accum(rl);
 			min_xmit = ((txc->vrate * dt) >> 3);
 
