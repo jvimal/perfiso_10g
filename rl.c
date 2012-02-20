@@ -146,7 +146,7 @@ void iso_rl_show(struct iso_rl *rl, struct seq_file *s) {
 	}
 }
 
-/* This function could be called from HARDIRQ context */
+
 inline void iso_rl_clock(struct iso_rl *rl) {
 	u64 cap, us;
 	ktime_t now;
