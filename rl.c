@@ -93,8 +93,22 @@ enum iso_verdict iso_rl_xmit(struct iso_rl *rl, struct sk_buff *pkt) {
 
 	len = skb_size(pkt);
 
-	if(len < l->tokens) {
+	/* Refresh the local pool if we're running out */
+
+	/* We're guaranteed that iso_rl_xmit will be called only for leaf rate limiters */
+	if(*l->token_pool < len) {
+		spin_lock(&rl->parent->spinlock);
+		bunch = iso_rl_borrow(rl->parent, len);
+		spin_unlock(&rl->parent->spinlock);
+
+		*l->token_pool += bunch;
+		*l->token_pool = min(*l->token_pool, iso_rl_singleq_burst(rl));
+	}
+
+	if(len < min(l->tokens, *l->token_pool)) {
 		l->tokens -= len;
+		*l->token_pool -= len;
+
 		if(l->feedback_backlog) {
 			if(!skb_set_feedback(pkt))
 				l->feedback_backlog = 0;
@@ -210,23 +224,13 @@ enum hrtimer_restart iso_rl_timeout(struct hrtimer *timer) {
 }
 
 /* Borrow at least min tokens; called with rl lock held */
-inline u64 iso_rl_borrow(struct iso_rl *rl, u64 minimum) {
+inline u64 iso_rl_borrow(struct iso_rl *rl, u32 minimum) {
 	u64 borrow = max(iso_rl_singleq_burst(rl), minimum);
-	u64 borrowp;
 	u64 ret = 0;
 
 	if(rl->total_tokens >= borrow) {
 		rl->total_tokens -= borrow;
 		ret = borrow;
-	} else if(rl->parent != NULL) {
-		borrowp = iso_rl_borrow(rl->parent, minimum);
-		rl->total_tokens += borrowp;
-
-		/* Unroll the second iteration */
-		if(borrowp && rl->total_tokens >= borrow) {
-			rl->total_tokens -= borrow;
-			ret = borrow;
-		}
 	}
 
 	return ret;

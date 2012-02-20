@@ -108,13 +108,12 @@ inline void iso_rl_clock(struct iso_rl *);
 
 inline enum iso_verdict iso_rl_enqueue(struct iso_rl *, struct sk_buff *);
 enum iso_verdict iso_rl_xmit(struct iso_rl *, struct sk_buff *);
-inline u64 iso_rl_borrow(struct iso_rl *, u64 minimum);
 void iso_rl_dequeue(unsigned long _rl);
 enum hrtimer_restart iso_rl_timeout(struct hrtimer *);
 
-inline u64 iso_rl_borrow(struct iso_rl *, u64 minimum);
+inline u64 iso_rl_borrow(struct iso_rl *, u32 minimum);
 static inline ktime_t iso_rl_gettimeout(void);
-static inline u64 iso_rl_singleq_burst(struct iso_rl *);
+static inline u32 iso_rl_singleq_burst(struct iso_rl *);
 
 inline void skb_xmit(struct sk_buff *skb);
 
@@ -155,7 +154,7 @@ static inline ktime_t iso_rl_gettimeout() {
 	return ktime_set(0, ISO_TOKENBUCKET_TIMEOUT_NS);
 }
 
-static inline u64 iso_rl_singleq_burst(struct iso_rl *rl) {
+static inline u32 iso_rl_singleq_burst(struct iso_rl *rl) {
 	return ((rl->rate * ISO_MAX_BURST_TIME_US) >> 3) / ISO_BURST_FACTOR;
 }
 
