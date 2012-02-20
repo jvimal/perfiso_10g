@@ -142,7 +142,6 @@ inline enum iso_verdict iso_rl_enqueue(struct iso_rl *rl, struct sk_buff *pkt) {
 
 /* This function MUST be executed with interrupts enabled */
 void iso_rl_dequeue(unsigned long _rl) {
-	u64 sum = 0;
 	u32 size;
 	int timeout = 0;
 	struct sk_buff *pkt;
@@ -167,11 +166,11 @@ void iso_rl_dequeue(unsigned long _rl) {
 		goto unlock;
 
 	pkt = skb_peek(skq);
-	sum = size = skb_size(pkt);
+	size = skb_size(pkt);
 	rl->first_pkt_size = size;
 	timeout = 1;
 
-	while(sum <= rl->total_tokens) {
+	while(size <= rl->total_tokens) {
 		pkt = __skb_dequeue(skq);
 		rl->total_tokens -= size;
 		rl->bytes_enqueued -= size;
@@ -184,7 +183,7 @@ void iso_rl_dequeue(unsigned long _rl) {
 		}
 
 		pkt = skb_peek(skq);
-		sum += (size = skb_size(pkt));
+		size = skb_size(pkt);
 		rl->first_pkt_size = size;
 	}
 
