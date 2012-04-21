@@ -44,6 +44,8 @@ struct iso_vq {
 	u64 weight;
 
 	ktime_t last_update_time;
+	ktime_t last_timeout_activated;
+	struct hrtimer inactive_timer;
 
 	struct iso_vq_stats __percpu *percpu_stats;
 	spinlock_t spinlock;
@@ -59,6 +61,7 @@ struct iso_vq {
 extern struct list_head vq_list;
 extern s64 vq_total_tokens;
 extern ktime_t vq_last_update_time;
+extern u32 vq_active_weight;
 
 #define for_each_vq(vq) list_for_each_entry_safe(vq, vq_next, &vq_list, list)
 #define ISO_VQ_DEFAULT_RATE_MBPS (100) /* This parameter shouldn't matter */

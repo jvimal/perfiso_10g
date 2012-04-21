@@ -56,6 +56,10 @@ int iso_vq_init(struct iso_vq *vq) {
 	vq->weight = 1;
 	vq->last_update_time = ktime_get();
 
+	vq->last_timeout_activated = ktime_get();
+	hrtimer_init(&vq->inactive_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	vq->inactive_timer.function = iso_vq_timeout;
+
 	vq->percpu_stats = alloc_percpu(struct iso_vq_stats);
 	if(vq->percpu_stats == NULL)
 		return -ENOMEM;
@@ -81,6 +85,7 @@ void iso_vq_free(struct iso_vq *vq) {
 
 	synchronize_rcu();
 	list_del(&vq->list);
+	hrtimer_cancel(&vq->inactive_timer);
 	free_percpu(vq->percpu_stats);
 	kfree(vq);
 }
@@ -93,11 +98,17 @@ void iso_vq_enqueue(struct iso_vq *vq, struct sk_buff *pkt) {
 	struct iso_vq_stats *stats = per_cpu_ptr(vq->percpu_stats, cpu);
 	u32 len = skb_size(pkt);
 
+	if(unlikely(!vq->active)) {
+		vq->active = 1;
+	} else {
+
+	}
+
 	if(unlikely(dt > ISO_VQ_UPDATE_INTERVAL_US)) {
-		if(spin_trylock_irqsave(&vq_spinlock, flags)) {
-			iso_vq_tick(dt);
-			vq_last_update_time = now;
-			spin_unlock_irqrestore(&vq_spinlock, flags);
+		if(spin_trylock_irqsave(&vq->spinlock, flags)) {
+			iso_vq_drain(vq, dt);
+			vq->last_update_time = now;
+			spin_unlock_irqrestore(&vq->spinlock, flags);
 		}
 	}
 
