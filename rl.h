@@ -63,6 +63,12 @@ struct iso_rl {
 	struct iso_tx_class *txc;
 };
 
+struct iso_rl_cached {
+	struct iso_rl *addr;
+};
+
+#define RL_CACHED(skb) (((struct iso_rl_cached *)((skb)->cb))->addr)
+
 /* The per-cpu control block for rate limiters */
 struct iso_rl_cb {
 	spinlock_t spinlock;
@@ -97,7 +103,7 @@ static inline int skb_size(struct sk_buff *skb) {
 	return ETH_HLEN + skb->len;
 }
 
-#define ISO_ECN_REFLECT_MASK (1 << 3)
+#define ISO_ECN_REFLECT_MASK (1 << 0)
 
 static inline int skb_set_feedback(struct sk_buff *skb) {
 	struct ethhdr *eth;

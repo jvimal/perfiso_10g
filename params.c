@@ -34,6 +34,7 @@ int ISO_RFAIR_FEEDBACK_TIMEOUT_DEFAULT_RATE = 10;
 int IsoGlobalEnabled = 0;
 int IsoAutoGenerateFeedback = 1;
 int ISO_FEEDBACK_INTERVAL_US = 100;
+int IsoCrazyIdea = 0;
 
 // TODO: We are assuming that we don't need to do any VLAN tag
 // ourselves
@@ -75,6 +76,7 @@ struct iso_param iso_params[32] = {
   {"ISO_BURST_FACTOR", &ISO_BURST_FACTOR },
   {"ISO_VQ_UPDATE_INTERVAL_US", &ISO_VQ_UPDATE_INTERVAL_US },
   {"ISO_TXC_UPDATE_INTERVAL_US", &ISO_TXC_UPDATE_INTERVAL_US },
+  {"IsoCrazyIdea", &IsoCrazyIdea},
   {"", NULL},
 };
 

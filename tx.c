@@ -173,15 +173,26 @@ enum iso_verdict iso_tx(struct sk_buff *skb, const struct net_device *out)
 	vq = txc->vq;
 
 	/* Enqueue in RL */
-	verdict = iso_rl_enqueue(rl, skb, cpu);
-	q = per_cpu_ptr(rl->queue, cpu);
+	RL_CACHED(skb) = NULL;
+	if(IsoCrazyIdea) {
+		/* Enqueue in root first */
+		struct iso_rl_queue *rootq;
+		/* Cache the rate limiter inside the pkt */
+		RL_CACHED(skb) = rl;
+		verdict = iso_rl_enqueue(&rl->txc->rl, skb, cpu);
+		rootq = per_cpu_ptr(rl->txc->rl.queue, cpu);
+		iso_rl_dequeue((unsigned long)rootq);
+	} else {
+		verdict = iso_rl_enqueue(rl, skb, cpu);
+		q = per_cpu_ptr(rl->queue, cpu);
 
-	if(likely(vq)) {
-		if(iso_vq_over_limits(vq))
-			q->feedback_backlog++;
+		if(likely(vq)) {
+			if(iso_vq_over_limits(vq))
+				q->feedback_backlog++;
+		}
+
+		iso_rl_dequeue((unsigned long)q);
 	}
-
-	iso_rl_dequeue((unsigned long)q);
  accept:
 	rcu_read_unlock();
 	return verdict;

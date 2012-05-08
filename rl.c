@@ -231,13 +231,10 @@ void iso_rl_dequeue(unsigned long _q) {
 				q->feedback_backlog = 0;
 		}
 
-		if(rl->txc == NULL) {
-			skb_xmit(pkt);
-			q->bytes_xmit += size;
-		} else {
-			/* Enqueue in parent tx class's rate limiter */
-			__skb_queue_tail(&list, pkt);
-		}
+		//skb_xmit(pkt);
+		/* To be transmitted later */
+		__skb_queue_tail(&list, pkt);
+		q->bytes_xmit += size;
 
 		if(skb_queue_len(skq) == 0) {
 			timeout = 0;
@@ -249,16 +246,55 @@ void iso_rl_dequeue(unsigned long _q) {
 		q->first_pkt_size = size;
 	}
 
+	int next;
 unlock:
+#define XMIT 0
+#define ROOT 1
+#define AGAIN 2
 
-	if(rl->txc != NULL) {
-		/* Now transfer the dequeued packets to the parent's queue */
-		while((pkt = __skb_dequeue(&list)) != NULL) {
+	if(rl->txc != NULL)
+		next = ROOT;
+	else
+		next = XMIT;
+
+	/* Flip the order.. */
+	if(IsoCrazyIdea) {
+		if(next == XMIT)
+			next = AGAIN;
+		if(next == ROOT)
+			next = XMIT;
+		/* next can't be AGAIN */
+	}
+
+	/* Now transfer the dequeued packets to the next's queue */
+	while((pkt = __skb_dequeue(&list)) != NULL) {
+		if(next == ROOT) {
 			verdict = iso_rl_enqueue(&rl->txc->rl, pkt, q->cpu);
 			if(verdict == ISO_VERDICT_DROP)
 				kfree_skb(pkt);
-		}
+		} else if(next == AGAIN) {
+			/* Enqueue to cached per-dest rate limiter's queue */
+			struct iso_rl *cached_rl = RL_CACHED(pkt);
+			if(cached_rl == NULL) {
+				/* Can happen due to race condition */
+				kfree_skb(pkt);
+				continue;
+			}
 
+			verdict = iso_rl_enqueue(cached_rl, pkt, q->cpu);
+
+			/* No point of returning verdict from dequeue routing, so we have to free pkt */
+			if(verdict == ISO_VERDICT_DROP)
+				kfree_skb(pkt);
+
+			/* Dequeue from per-dest rate limiter */
+			iso_rl_dequeue((unsigned long)per_cpu_ptr(cached_rl->queue, q->cpu));
+		} else {
+			skb_xmit(pkt);
+		}
+	}
+
+	if(next == ROOT) {
 		/* Trigger the parent dequeue */
 		rootq = per_cpu_ptr(rl->txc->rl.queue, q->cpu);
 		iso_rl_dequeue((unsigned long)rootq);

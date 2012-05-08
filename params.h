@@ -30,6 +30,7 @@ extern int IsoGlobalEnabled;
 extern int IsoAutoGenerateFeedback;
 extern int ISO_FEEDBACK_INTERVAL_US;
 extern int ISO_TXC_UPDATE_INTERVAL_US;
+extern int IsoCrazyIdea;
 
 // TODO: We are assuming that we don't need to do any VLAN tag
 // ourselves
@@ -44,7 +45,7 @@ extern int ISO_BURST_FACTOR;
 extern int ISO_VQ_UPDATE_INTERVAL_US;
 
 // MUST be 1 less than a power of 2
-#define ISO_MAX_QUEUE_LEN_PKT (127)
+#define ISO_MAX_QUEUE_LEN_PKT (20)
 
 /* These MUST be a power of 2 as well */
 #define ISO_MAX_TX_BUCKETS (256)
