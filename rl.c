@@ -150,10 +150,12 @@ void iso_rl_show(struct iso_rl *rl, struct seq_file *s) {
 inline void iso_rl_clock(struct iso_rl *rl) {
 	u64 cap, us;
 	ktime_t now;
+	unsigned long flags;
 
 	if(!iso_rl_should_refill(rl))
 		return;
 
+	spin_lock_irqsave(&rl->spinlock, flags);
 	now = ktime_get();
 	us = ktime_us_delta(now, rl->last_update_time);
 	rl->total_tokens += (rl->rate * us) >> 3;
@@ -163,6 +165,7 @@ inline void iso_rl_clock(struct iso_rl *rl) {
 	rl->total_tokens = min(cap, rl->total_tokens);
 
 	rl->last_update_time = now;
+	spin_unlock_irqrestore(&rl->spinlock, flags);
 }
 
 enum iso_verdict iso_rl_enqueue(struct iso_rl *rl, struct sk_buff *pkt, int cpu) {
