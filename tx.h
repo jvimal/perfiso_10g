@@ -52,6 +52,7 @@ struct iso_tx_class {
 extern struct hlist_head iso_tx_bucket[ISO_MAX_TX_BUCKETS];
 extern struct list_head txc_list;
 extern int txc_total_weight;
+extern atomic_t txc_active_rate;
 extern spinlock_t txc_spinlock;
 
 #define for_each_txc(txc) list_for_each_entry_safe(txc, txc_next, &txc_list, list)
@@ -65,6 +66,7 @@ void iso_txc_init(struct iso_tx_class *);
 struct iso_tx_class *iso_txc_alloc(iso_class_t);
 void iso_txc_free(struct iso_tx_class *);
 void iso_txc_show(struct iso_tx_class *, struct seq_file *);
+inline void iso_txc_global_tick(void);
 
 #if defined ISO_TX_CLASS_DEV
 int iso_txc_dev_install(char *);
@@ -77,8 +79,8 @@ int iso_txc_mark_install(char *mark);
 int iso_txc_install(char *klass);
 void iso_txc_prealloc(struct iso_tx_class *, int);
 void iso_txc_allocator(struct work_struct *);
-inline void iso_txc_tick(void);
 static inline void iso_txc_recompute_rates(void);
+void iso_txc_check_idle(void);
 
 void iso_state_init(struct iso_per_dest_state *);
 struct iso_per_dest_state *iso_state_get(struct iso_tx_class *, struct sk_buff *, int rx);

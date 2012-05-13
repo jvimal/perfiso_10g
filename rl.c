@@ -155,6 +155,12 @@ inline void iso_rl_clock(struct iso_rl *rl) {
 	if(!iso_rl_should_refill(rl))
 		return;
 
+	if(rl->txc == NULL) {
+		struct iso_tx_class *txc = container_of(rl, struct iso_tx_class, rl);
+		iso_txc_rl_tick(txc, rl);
+		return;
+	}
+
 	spin_lock_irqsave(&rl->spinlock, flags);
 	now = ktime_get();
 	us = ktime_us_delta(now, rl->last_update_time);

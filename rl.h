@@ -90,6 +90,7 @@ enum hrtimer_restart iso_rl_timeout(struct hrtimer *);
 inline int iso_rl_borrow_tokens(struct iso_rl *, struct iso_rl_queue *);
 static inline ktime_t iso_rl_gettimeout(void);
 static inline u64 iso_rl_singleq_burst(struct iso_rl *);
+extern void iso_txc_rl_tick(struct iso_tx_class *, struct iso_rl *);
 
 inline void skb_xmit(struct sk_buff *skb);
 
