@@ -92,54 +92,57 @@ inline void iso_txc_global_tick() {
 
 inline void iso_txc_rl_tick(struct iso_tx_class *txc, struct iso_rl *rl) {
 	unsigned long flags;
-	int factor;
+	int active_rate;
 	ktime_t now;
-	u64 us, min_borrow;
+	u64 us, min_borrow, max_tokens, curr_rate;
 
 	now = ktime_get();
 	us = ktime_us_delta(now, rl->last_update_time);
-	if(likely(us < ISO_RL_UPDATE_INTERVAL_US))
-		return;
 
 	if(unlikely(ktime_us_delta(now, txc_last_check_time) > 10000))
 		iso_txc_check_idle();
 
-	spin_lock_irqsave(&rl->spinlock, flags);
-	/* First figure out total accumulated bytes */
-	iso_rl_accum(rl);
+	if(!spin_trylock_irqsave(&rl->spinlock, flags))
+		return;
 
-	if(rl->accum_enqueued > 0) {
-		if(!txc->active) {
-			txc->active = 1;
-			atomic_add(rl->rate, &txc_active_rate);
-		}
-	} else {
-		if(txc->active) {
-			txc->active = 0;
-			atomic_sub(rl->rate, &txc_active_rate);
-		}
+	if(rl->waiting && !txc->active) {
+		txc->active = 1;
+		rl->rate = txc->weight * ISO_MAX_TX_RATE / txc_total_weight;
+		atomic_add(rl->rate, &txc_active_rate);
 	}
 
-	factor = atomic_read(&txc_active_rate);
-	if(factor == 0)
-		factor = rl->rate;
+	active_rate = atomic_read(&txc_active_rate);
 
-	min_borrow = (us * ISO_MAX_TX_RATE * rl->rate / factor) >> 3;
+	if(active_rate == 0) {
+		/* This shouldn't be the case */
+		active_rate = rl->rate;
+	}
+
+	curr_rate = (u64)ISO_MAX_TX_RATE * rl->rate / active_rate;
+	min_borrow = (us * curr_rate) >> 3;
 
 	if(spin_trylock_irq(&txc_spinlock)) {
 		iso_txc_global_tick();
-		min_borrow = min(min_borrow, (u64)txc_total_tokens);
+
+		if(txc_total_tokens < min_borrow) {
+			min_borrow = (rl->rate * us) >> 3;
+		}
 
 		rl->total_tokens += min_borrow;
 		txc_total_tokens -= min_borrow;
 
+		spin_unlock_irq(&txc_spinlock);
+
 		/* This ensures that between updates, this rate limiter does
 		   not burst at more than max tx rate */
-		rl->total_tokens = min(rl->total_tokens, (us * ISO_MAX_TX_RATE) >> 3);
+		//max_tokens = (u64)4 * ISO_MIN_BURST_BYTES;
+
+		rl->total_tokens = min(rl->total_tokens, (ISO_MAX_TX_RATE * 200LLU) >> 3);
+		rl->total_tokens = max(rl->total_tokens, ISO_MIN_BURST_BYTES);
 		rl->last_update_time = now;
-		spin_unlock_irq(&txc_spinlock);
 	}
 
+ unlock:
 	spin_unlock_irqrestore(&rl->spinlock, flags);
 }
 

@@ -106,6 +106,8 @@ void iso_rl_init(struct iso_rl *rl) {
 		spin_lock_init(&q->spinlock);
 
 		q->cpu = i;
+		q->waiting = 0;
+
 		q->rl = rl;
 		q->cputimer = &cb->timer;
 
@@ -114,6 +116,7 @@ void iso_rl_init(struct iso_rl *rl) {
 
 	INIT_LIST_HEAD(&rl->prealloc_list);
 	rl->txc = NULL;
+	rl->waiting = 0;
 }
 
 void iso_rl_free(struct iso_rl *rl) {
@@ -126,8 +129,9 @@ void iso_rl_show(struct iso_rl *rl, struct seq_file *s) {
 	struct iso_rl_queue *q;
 	int i, first = 1;
 
-	seq_printf(s, "ip %x   rate %u   total_tokens %llu   last %llx   %p\n",
-			   rl->ip, rl->rate, rl->total_tokens, *(u64 *)&rl->last_update_time, rl);
+	seq_printf(s, "ip %x   rate %u   total_tokens %llu   last %llx   %p (%d)\n",
+			   rl->ip, rl->rate, rl->total_tokens, *(u64 *)&rl->last_update_time,
+			   rl, rl->waiting);
 
 	for_each_online_cpu(i) {
 		if(first) {
@@ -152,7 +156,10 @@ inline void iso_rl_clock(struct iso_rl *rl) {
 	ktime_t now;
 	unsigned long flags;
 
-	if(!iso_rl_should_refill(rl))
+	now = ktime_get();
+	us = ktime_us_delta(now, rl->last_update_time);
+
+	if(likely(us < ISO_RL_UPDATE_INTERVAL_US))
 		return;
 
 	if(rl->txc == NULL) {
@@ -326,6 +333,15 @@ inline int iso_rl_borrow_tokens(struct iso_rl *rl, struct iso_rl_queue *q) {
 		rl->total_tokens -= borrow;
 		q->tokens += borrow;
 		timeout = 0;
+		if(q->waiting) {
+			q->waiting = 0;
+			rl->waiting--;
+		}
+	} else {
+		if(!q->waiting) {
+			q->waiting = 1;
+			rl->waiting++;
+		}
 	}
 
 	if(iso_exiting)
