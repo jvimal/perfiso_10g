@@ -75,6 +75,7 @@ static int iso_csvstats_proc_seq_show(struct seq_file *s, void *v) {
 	for_each_txc(txc) {
 		rl = &txc->rl;
 		iso_class_show(txc->klass, buff);
+		iso_rl_accum(rl);
 		seq_printf(s, "tx,%s,%llu\n", buff, txc->rl.accum_xmit);
 	}
 
