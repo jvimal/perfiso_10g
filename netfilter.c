@@ -91,9 +91,7 @@ unsigned int iso_rx_netfilter(unsigned int hooknum,
 	if(in != iso_netdev)
 		return NF_ACCEPT;
 
-	rcu_read_lock_bh();
 	verdict = iso_rx(skb, in);
-	rcu_read_unlock_bh();
 
 	switch(verdict) {
 	case ISO_VERDICT_DROP:
