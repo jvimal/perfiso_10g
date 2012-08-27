@@ -200,7 +200,6 @@ struct iso_per_dest_state
 							 int rx,
 							 enum iso_create_t create_flags)
 {
-	struct ethhdr *eth;
 	struct iphdr *iph;
 	struct iso_per_dest_state *state = NULL, *nextstate;
 	struct hlist_head *head;
@@ -209,6 +208,7 @@ struct iso_per_dest_state
 	u32 ip, hash;
 
 #ifndef NETFILTER
+	struct ethhdr *eth;
 	eth = eth_hdr(skb);
 
 	if(unlikely(eth->h_proto != __constant_htons(ETH_P_IP))) {

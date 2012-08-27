@@ -190,11 +190,15 @@ enum iso_verdict iso_rl_enqueue(struct iso_rl *rl, struct sk_buff *pkt, int cpu)
 	q->bytes_enqueued += skb_size(pkt);
 
 	if(rl->txc == NULL && q->bytes_enqueued > ISO_TX_MARK_THRESH) {
+#ifndef NETFILTER
 		struct ethhdr *eth = eth_hdr(pkt);
 		if(likely(eth->h_proto == __constant_htons(ETH_P_IP))) {
+#endif
 			struct iphdr *iph = ip_hdr(pkt);
 			ipv4_change_dsfield(iph, 0, 0x3);
+#ifndef NETFILTER
 		}
+#endif
 	}
 
 	verdict = ISO_VERDICT_SUCCESS;

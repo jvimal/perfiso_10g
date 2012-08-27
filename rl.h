@@ -100,14 +100,14 @@ static inline int skb_size(struct sk_buff *skb) {
 #define ISO_ECN_REFLECT_MASK (1 << 3)
 
 static inline int skb_set_feedback(struct sk_buff *skb) {
-	struct ethhdr *eth;
 	struct iphdr *iph;
 	u8 newdscp;
-
+#ifndef NETFILTER
+	struct ethhdr *eth;
 	eth = eth_hdr(skb);
 	if(unlikely(eth->h_proto != __constant_htons(ETH_P_IP)))
 		return 1;
-
+#endif
 	iph = ip_hdr(skb);
 	newdscp = iph->tos | ISO_ECN_REFLECT_MASK;
 	ipv4_copy_dscp(newdscp, iph);
@@ -115,13 +115,13 @@ static inline int skb_set_feedback(struct sk_buff *skb) {
 }
 
 static inline int skb_has_feedback(struct sk_buff *skb) {
-	struct ethhdr *eth;
 	struct iphdr *iph;
-
+#ifndef NETFILTER
+	struct ethhdr *eth;
 	eth = eth_hdr(skb);
 	if(unlikely(eth->h_proto != __constant_htons(ETH_P_IP)))
 		return 0;
-
+#endif
 	iph = ip_hdr(skb);
 	return iph->tos & ISO_ECN_REFLECT_MASK;
 }
