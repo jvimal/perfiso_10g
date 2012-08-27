@@ -2,8 +2,15 @@
 #include "rl.h"
 
 #ifndef NETFILTER
-#error "Compiling bridge.c without -DNETFILTER"
+#error "Compiling netfilter.c without -DNETFILTER"
 #endif
+
+/*
+ * TODO: running this code for a long time triggers a
+ * "bug while scheduling atomic"; so we're grabbing a
+ * lock somewhere...  Until that's sorted, netfilter
+ * stays in a separate branch.
+ */
 
 typedef int (*ok_fn_t)(struct sk_buff *);
 struct ok_func_ptr {
