@@ -208,6 +208,7 @@ struct iso_per_dest_state
 
 	u32 ip, hash;
 
+#ifndef NETFILTER
 	eth = eth_hdr(skb);
 
 	if(unlikely(eth->h_proto != __constant_htons(ETH_P_IP))) {
@@ -215,6 +216,7 @@ struct iso_per_dest_state
 		/* Right now, we just pass it thru */
 		return NULL;
 	}
+#endif
 
 	iph = ip_hdr(skb);
 

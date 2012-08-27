@@ -150,14 +150,13 @@ static inline iso_class_t iso_rx_classify(struct sk_buff *skb) {
 
 #elif defined ISO_TX_CLASS_IPADDR
 static inline iso_class_t iso_txc_classify(struct sk_buff *skb) {
-	struct ethhdr *eth;
 	u32 addr = 0;
-
+#ifndef NETFILTER
+	struct ethhdr *eth;
 	eth = eth_hdr(skb);
-	if(likely(eth->h_proto == __constant_htons(ETH_P_IP))) {
+	if(likely(eth->h_proto == __constant_htons(ETH_P_IP)))
+#endif
 		addr = ip_hdr(skb)->saddr;
-	}
-
 	return addr;
 }
 
@@ -195,12 +194,13 @@ static inline iso_class_t iso_class_parse(char *ipaddr) {
 
 static inline iso_class_t iso_rx_classify(struct sk_buff *skb) {
 	iso_class_t klass = 0;
+#ifndef NETFILTER
 	struct ethhdr *eth = NULL;
-	klass = 0;
 	eth = eth_hdr(skb);
-	if(likely(eth->h_proto == __constant_htons(ETH_P_IP))) {
+	if(likely(eth->h_proto == __constant_htons(ETH_P_IP)))
+#endif
 		klass = ip_hdr(skb)->daddr;
-	}
+
 	return klass;
 }
 
