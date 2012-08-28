@@ -41,19 +41,18 @@ enum iso_verdict iso_rx(struct sk_buff *skb, const struct net_device *in)
 	if(txc == NULL)
 		goto accept;
 
-	state = iso_state_get(txc, skb, 1, ISO_CREATE_RL);
-	if(unlikely(state == NULL))
-		goto accept;
+	state = iso_state_get(txc, skb, 1, ISO_CREATE_RL && iso_is_feedback_marked(skb));
+	if(likely(state != NULL)) {
+	  rc = &state->tx_rc;
+	  changed = iso_rc_rx(rc, skb);
 
-	rc = &state->tx_rc;
-	changed = iso_rc_rx(rc, skb);
-
-	/* XXX: for now */
-	if(changed && ISO_VQ_DRAIN_RATE_MBPS <= ISO_MAX_TX_RATE)
+	  /* XXX: for now */
+	  if(changed && ISO_VQ_DRAIN_RATE_MBPS <= ISO_MAX_TX_RATE)
 		state->rl->rate = rc->rfair;
 
-	if(unlikely(iso_is_generated_feedback(skb)))
+	  if(unlikely(iso_is_generated_feedback(skb)))
 		verdict = ISO_VERDICT_DROP;
+	}
 
 	stats = per_cpu_ptr(vq->percpu_stats, smp_processor_id());
 	if(IsoAutoGenerateFeedback) {
@@ -63,16 +62,14 @@ enum iso_verdict iso_rx(struct sk_buff *skb, const struct net_device *in)
 
 		if(!iso_vq_over_limits(vq)) {
 			ipv4_change_dsfield(iph, 0, 0x2);
-		} else {
-			ipv4_change_dsfield(iph, 0, 0x3);
 		}
-#if 0
+
 		if(dt > ISO_FEEDBACK_INTERVAL_US) {
+		  /* May be send the number of packets marked in the network as feedback */
 			iso_generate_feedback(iso_vq_over_limits(vq) || stats->network_marked, skb);
 			stats->last_feedback_gen_time = now;
 			stats->network_marked = 0;
 		}
-#endif
 	}
 
  accept:
