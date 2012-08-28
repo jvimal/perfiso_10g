@@ -178,6 +178,8 @@ enum iso_verdict iso_tx(struct sk_buff *skb, const struct net_device *out)
 	rl = state->rl;
 	vq = txc->vq;
 
+	iso_ecn_enable(skb);
+
 	/* Enqueue in RL */
 	verdict = iso_rl_enqueue(rl, skb, cpu);
 	q = per_cpu_ptr(rl->queue, cpu);
@@ -556,6 +558,7 @@ int iso_txc_install(char *klass) {
 #endif
 	return ret;
 }
+
 /* Local Variables: */
 /* indent-tabs-mode:t */
 /* End: */

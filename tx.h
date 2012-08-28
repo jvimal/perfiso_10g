@@ -123,6 +123,14 @@ static inline void iso_txc_recompute_rates() {
 	spin_unlock_irqrestore(&txc_spinlock, flags);
 }
 
+static inline void iso_ecn_enable(struct sk_buff *skb) {
+  struct iphdr *iph = ip_hdr(skb);
+  if(likely(iph)) {
+	ipv4_change_dsfield(iph, 0, 0x2);
+  }
+}
+
+
 #endif /* __TX_H__ */
 
 /* Local Variables: */
