@@ -44,6 +44,7 @@ static int iso_stats_proc_seq_show(struct seq_file *s, void *v)
 	int i;
 
 	seq_printf(s, "iso_param_dev %s\n", iso_param_dev);
+	iso_rl_show(rootrl, s);
 
 	for(i = 0; i < ISO_MAX_TX_BUCKETS; i++) {
 		head = &iso_tx_bucket[i];
@@ -74,6 +75,7 @@ static int iso_csvstats_proc_seq_show(struct seq_file *s, void *v) {
 
 	for_each_txc(txc) {
 		rl = &txc->rl;
+		iso_rl_accum(rl);
 		iso_class_show(txc->klass, buff);
 		seq_printf(s, "tx,%s,%llu\n", buff, txc->rl.accum_xmit);
 	}

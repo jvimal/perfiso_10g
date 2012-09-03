@@ -279,6 +279,7 @@ static int iso_sys_set_txc_weight(const char *val, struct kernel_param *kp) {
 	spin_lock_irqsave(&txc->writelock, flags);
 	txc_total_weight -= txc->weight;
 	txc->weight = (u32)weight;
+	txc->rl.weight = weight;
 	txc_total_weight += txc->weight;
 	spin_unlock_irqrestore(&txc->writelock, flags);
 
