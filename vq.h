@@ -64,6 +64,7 @@ extern struct list_head vq_list;
 extern s64 vq_total_tokens;
 extern ktime_t vq_last_update_time, vq_last_check_time;
 extern atomic_t vq_active_rate;
+extern u32 vq_total_weight;
 
 #define for_each_vq(vq) list_for_each_entry_safe(vq, vq_next, &vq_list, list)
 #define ISO_VQ_DEFAULT_RATE_MBPS (100) /* This parameter shouldn't matter */
@@ -84,7 +85,7 @@ void iso_vq_check_idle(void);
 
 static inline struct iso_vq *iso_vq_find(iso_class_t);
 void iso_vq_show(struct iso_vq *, struct seq_file *);
-
+void iso_vq_show_summary(struct seq_file *);
 
 extern struct hlist_head vq_bucket[ISO_MAX_VQ_BUCKETS];
 
