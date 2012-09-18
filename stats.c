@@ -59,6 +59,7 @@ static int iso_stats_proc_seq_show(struct seq_file *s, void *v)
 		iso_vq_show(vq, s);
 	}
 
+    iso_vq_show_summary(s);
 	return 0;
 }
 
