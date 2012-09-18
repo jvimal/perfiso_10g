@@ -328,6 +328,7 @@ static int iso_sys_set_vq_weight(const char *val, struct kernel_param *kp) {
 
 	spin_lock_irqsave(&vq_spinlock, flags);
 	vq->weight = (u64)weight;
+	vq_total_weight += weight;
 	iso_vq_calculate_rates();
 	spin_unlock_irqrestore(&vq_spinlock, flags);
 
