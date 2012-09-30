@@ -12,7 +12,7 @@
 // params
 int ISO_FALPHA = 8;
 /* All rates are in Mbps */
-int ISO_MAX_TX_RATE = 10000;
+int ISO_MAX_TX_RATE = 9800;
 // The VQ's net drain rate in Mbps is 90% of 10G ~ 9000 Mbps
 /* TODO: explain why this is 8500 and not 9000!  hint: due to GRO */
 int ISO_VQ_DRAIN_RATE_MBPS = 10000;
@@ -281,6 +281,7 @@ static int iso_sys_set_txc_weight(const char *val, struct kernel_param *kp) {
 	spin_lock_irqsave(&txc->writelock, flags);
 	txc_total_weight -= txc->weight;
 	txc->weight = (u32)weight;
+	txc->rl.weight = weight;
 	txc_total_weight += txc->weight;
 	spin_unlock_irqrestore(&txc->writelock, flags);
 

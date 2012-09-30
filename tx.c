@@ -61,6 +61,9 @@ inline void iso_txc_tick() {
 	if(likely(dt < ISO_TXC_UPDATE_INTERVAL_US))
 		return;
 
+	rootrl->rate = ISO_MAX_TX_RATE;
+	return;
+
 	if(spin_trylock_irqsave(&txc_spinlock, flags)) {
 		dt = ktime_us_delta(now, txc_last_update_time);
 		if(unlikely(dt < ISO_TXC_UPDATE_INTERVAL_US))
@@ -199,7 +202,9 @@ enum iso_verdict iso_tx(struct sk_buff *skb, const struct net_device *out)
 	/* Enqueue in RL */
 	verdict = iso_rl_enqueue(rl, skb, cpu);
 	q = per_cpu_ptr(rl->queue, cpu);
-	iso_rl_dequeue((unsigned long)q);
+
+	// iso_rl_dequeue((unsigned long)q);
+	iso_rl_dequeue_root();
  accept:
 	rcu_read_unlock();
 	return verdict;
@@ -317,6 +322,7 @@ struct iso_rl *iso_pick_rl(struct iso_tx_class *txc, __le32 ip) {
 
 void iso_txc_init(struct iso_tx_class *txc) {
 	int i;
+
 	for(i = 0; i < ISO_MAX_RL_BUCKETS; i++)
 		INIT_HLIST_HEAD(&txc->rl_bucket[i]);
 
@@ -358,6 +364,7 @@ struct iso_tx_class *iso_txc_alloc(iso_class_t klass) {
 		return NULL;
 
 	iso_txc_init(txc);
+	iso_rl_attach(rootrl, &txc->rl);
 	txc->klass = klass;
 
 	/* Preallocate some perdest state and rate limiters.  32 entries
@@ -387,6 +394,7 @@ void iso_txc_prealloc(struct iso_tx_class *txc, int num) {
 	struct iso_per_dest_state *state;
 	struct iso_rl *rl;
 	unsigned long flags;
+	char buff[32];
 
 	printk(KERN_INFO "Preallocating %d RLs and per-dest-states\n", num);
 
@@ -401,7 +409,8 @@ void iso_txc_prealloc(struct iso_tx_class *txc, int num) {
 			break;
 		}
 
-		rl = kmalloc(sizeof(*rl), GFP_KERNEL);
+		sprintf(buff, "rl%d", i);
+		rl = iso_rl_new(buff);
 		if(rl == NULL) {
 			free_percpu(state->tx_rc.stats);
 			kfree(state);
@@ -409,8 +418,9 @@ void iso_txc_prealloc(struct iso_tx_class *txc, int num) {
 		}
 
 		iso_state_init(state);
-		iso_rl_init(rl);
 		rl->txc = txc;
+		rl->cap = 1;
+		iso_rl_attach(&txc->rl, rl);
 
 		spin_lock_irqsave(&txc->writelock, flags);
 		txc->freelist_count++;
@@ -466,7 +476,8 @@ void iso_txc_free(struct iso_tx_class *txc) {
 		atomic_dec(&txc->vq->refcnt);
 	}
 
-	free_percpu(txc->rl.queue);
+	if(txc->rl.queue)
+		free_percpu(txc->rl.queue);
 	kfree(txc);
 }
 
@@ -541,6 +552,15 @@ int iso_txc_mark_install(char *mark) {
 	iso_class_t m = iso_class_parse(mark);
 	struct iso_tx_class *txc;
 	int ret = 0;
+	int i;
+	char buff[32];
+
+	for(i = 0; i < 32 && mark[i] != '\0'; i++) {
+		if(mark[i] == '\n') {
+			mark[i] = '\0';
+			break;
+		}
+	}
 
 	/* Check if we have already created */
 	txc = iso_txc_find(m);
@@ -550,6 +570,8 @@ int iso_txc_mark_install(char *mark) {
 	}
 
 	txc = iso_txc_alloc(m);
+	sprintf(buff, "root-%s", mark);
+	strncpy(txc->rl.name, buff, RLNAME_MAX_CHARS);
 	if(txc == NULL) {
 		ret = -1;
 		goto end;
