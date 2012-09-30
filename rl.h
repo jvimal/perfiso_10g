@@ -58,6 +58,7 @@ struct iso_rl {
 	/* 0 if the rl is really a "class" without a queue. */
 	int leaf;
 	int cap;
+	int throttled;
 
 	u64 accum_xmit, accum_enqueued;
 

@@ -92,7 +92,7 @@ void iso_rl_xmit_tasklet(unsigned long _cb) {
 			break;
 		}
 
-		iso_rl_dequeue((unsigned long)q);
+		sent += iso_rl_dequeue((unsigned long)q);
 	}
 
 	if(!list_empty(&cb->active_list) && !iso_exiting) {
@@ -118,6 +118,7 @@ int iso_rl_init(struct iso_rl *rl) {
 	rl->waiting = 0;
 	rl->accum_enqueued = 0;
 	rl->accum_xmit = 0;
+	rl->throttled = 0;
 
 	spin_lock_init(&rl->spinlock);
 
@@ -344,9 +345,14 @@ u32 iso_rl_dequeue(unsigned long _q) {
 	 * program the timeout for this queue */
 
 	if(unlikely(q->tokens < q->first_pkt_size)) {
-		timeout = iso_rl_borrow_tokens(rl, q);
-		if(timeout)
-			goto timeout;
+		if(!rl->throttled) {
+			timeout = iso_rl_borrow_tokens(rl, q);
+			if(timeout)
+				goto timeout;
+		} else {
+			timeout = 1;
+			goto done;
+		}
 	}
 
 	skq = &q->list;
@@ -435,6 +441,8 @@ inline int iso_rl_borrow_tokens(struct iso_rl *rl, struct iso_rl_queue *q) {
 		rl->total_tokens -= borrow;
 		q->tokens += borrow;
 		timeout = 0;
+	} else {
+		rl->throttled = 1;
 	}
 
 	if(iso_exiting)
@@ -513,7 +521,7 @@ inline void iso_rl_deactivate_tree(struct iso_rl *rl, struct iso_rl_queue *q) {
 
 static inline u64 _iso_rl_fill_tokens(struct iso_rl *rl, u64 tokens) {
 	struct iso_rl *childrl, *rlnext;
-	u32 child_share_unit, child_share, child_rate;
+	u32 child_share_unit, child_share;
 	u64 consumed = 0;
 
 	spin_lock(&rl->spinlock);
@@ -533,13 +541,14 @@ static inline u64 _iso_rl_fill_tokens(struct iso_rl *rl, u64 tokens) {
 
 			/* Don't tickle tokens faster than it should */
 			tokens = min_t(u64, tokens, (rl->rate * dt) >> 3);
-			rl->last_update_time = now;
 		}
 		extra = cap - (s64)rl->total_tokens;
 
 		if(extra > 0) {
 			consumed = min_t(u64, extra, tokens);
 			rl->total_tokens += consumed;
+			rl->last_update_time = now;
+			rl->throttled = 0;
 		}
 	}
 
@@ -552,14 +561,27 @@ static inline u64 _iso_rl_fill_tokens(struct iso_rl *rl, u64 tokens) {
 	if(child_share_unit == 0)
 		goto unlock;
 
-	/* TODO: The correct algorithm is to repeat until rl->total_tokens
-	 * is 0, but a single pass is usually sufficient. */
-	list_for_each_entry_safe(childrl, rlnext, &rl->waiting_list, waiting_node) {
-		child_share = childrl->weight * child_share_unit;
-		child_rate = rl->rate * childrl->weight / rl->active_weight;
-		childrl->rate = child_rate;
-		//rl->total_tokens -= child_share;
-		rl->total_tokens -= _iso_rl_fill_tokens(childrl, child_share);
+	child_share_unit = rl->total_tokens / rl->active_weight;
+	if(likely(child_share_unit > 0 && rl->active_weight < 10)) {
+		/* TODO: The correct algorithm is to repeat until rl->total_tokens
+		 * is 0, but a single pass is usually sufficient. */
+		list_for_each_entry_safe(childrl, rlnext, &rl->waiting_list, waiting_node) {
+			child_share = childrl->weight * child_share_unit;
+			//rl->total_tokens -= child_share;
+			rl->total_tokens -= _iso_rl_fill_tokens(childrl, child_share);
+		}
+	} else {
+		/* Switch to randomized scheduling to avoid fine grained token splitting */
+		int r = net_random() % rl->active_weight;
+		int w = 0;
+		list_for_each_entry_safe(childrl, rlnext, &rl->waiting_list, waiting_node) {
+			w += rl->weight;
+			if(w > r) {
+				rl->total_tokens -= _iso_rl_fill_tokens(childrl, rl->total_tokens);
+				rl->throttled = 0;
+				break;
+			}
+		}
 	}
 
  unlock:
