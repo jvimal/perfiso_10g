@@ -15,14 +15,21 @@ new
 tc qdisc add dev $dev root handle 1: htb default 1
 tc class add dev $dev classid 1:1 parent 1: htb rate 1Gbit
 tc class add dev $dev classid 1:10 parent 1:1 htb rate 1Gbit
-tc class add dev $dev classid 1:11 parent 1:1 htb rate 1Gbit
-tc class add dev $dev classid 1:12 parent 1:1 htb rate 1Gbit
+tc class add dev $dev classid 1:100 parent 1:10 htb rate 1Gbit
+tc class add dev $dev classid 1:101 parent 1:10 htb rate 1Gbit
+tc class add dev $dev classid 1:11 parent 1:1 htb rate 1Gbit prio 2
+tc class add dev $dev classid 1:12 parent 1:1 htb rate 1Gbit prio 2
 
 tc filter add dev $dev protocol ip parent 1: prio 1 u32 match \
     ip dport 5001 0xffff flowid 1:10
 
 tc filter add dev $dev protocol ip parent 1: prio 1 u32 match \
-    ip dport 5002 0xffff flowid 1:11
+    ip dport 5002 0xffff flowid 1:10
+
+tc filter add dev $dev protocol ip parent 1:10 prio 1 u32 match \
+    ip dport 5001 0xffff flowid 1:100
+tc filter add dev $dev protocol ip parent 1:10 prio 1 u32 match \
+    ip dport 5002 0xffff flowid 1:101
 
 tc filter add dev $dev protocol ip parent 1: prio 1 u32 match \
-    ip dport 5003 0xffff flowid 1:12
+    ip dport 5003 0xffff flowid 1:11
