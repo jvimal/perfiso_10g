@@ -42,6 +42,7 @@
 #endif
 
 #include "rate_est.h"
+#include "rcp.h"
 
 struct mq_sched {
 	struct Qdisc *sch;
@@ -99,6 +100,7 @@ struct iso_rl_class {
 
 	u32 weight;
 	struct rate_est tx_rate_est;
+	struct rcp rcp;
 
 	struct iso_rate_cfg rate_to_time;
 	struct iso_rate_cfg conf_rate_tt;
@@ -151,6 +153,7 @@ static struct iso_rl_class *iso_rl_find(u32 handle, struct mq_sched *global);
 static struct iso_rl_class *iso_rl_classify(struct sk_buff *skb, struct mq_sched *global, int *qerr);
 static struct sk_buff *iso_rl_dequeue_tree(struct iso_rl_queue *q, u64 now, struct iso_rl_local_sched *cb, u64 *);
 static u64 l2t_ns(struct iso_rate_cfg *r, unsigned int len);
+void iso_set_enforced_rate(struct iso_rl_class *cl);
 
 enum hrtimer_restart iso_rl_local_timeout(struct hrtimer *timer) {
 	/* schedue xmit tasklet to go into softirq context */
@@ -379,6 +382,10 @@ iso_rl_dequeue(struct iso_rl_queue *q, u64 now,
 	q->qstats.backlog -= size;
 	q->qstats.qlen--;
 	rate_est_update(&q->rl->tx_rate_est, size);
+	if (q->rl->parent) {
+		q->rl->wshare_rate_tt.rate_bps = q->rl->weight * q->rl->parent->rcp.fair_share_mbps * 1000000;
+		iso_set_enforced_rate(q->rl);
+	}
 timeout:
 	if (skq->qlen == 0) {
 		iso_rl_deactivate_queue(q);
@@ -434,6 +441,11 @@ iso_rl_dequeue_tree(struct iso_rl_queue *q, u64 now,
 			curr->deficit -= qdisc_pkt_len(skb);
 			bstats_update(&q->bstats, skb);
 			rate_est_update(&q->rl->tx_rate_est, qdisc_pkt_len(skb));
+			rcp_update(&q->rl->rcp);
+			if (q->rl->parent) {
+				q->rl->wshare_rate_tt.rate_bps = q->rl->parent->rcp.fair_share_mbps * 1000000;
+				iso_set_enforced_rate(q->rl);
+			}
 			return skb;
 		}
 	}
@@ -554,8 +566,11 @@ int iso_rl_class_init(struct iso_rl_class *cl)
 	iso_set_enforced_rate(cl);
 
 	cl->weight = 1;
-	if (rate_est_init(&cl->tx_rate_est, USEC_PER_SEC))
+	if (rate_est_init(&cl->tx_rate_est, 9000))
 		goto enobufs1;
+
+	/* Every 10ms */
+	rcp_init(&cl->rcp, 10000, &cl->tx_rate_est, 10000);
 
 	spin_lock_init(&cl->spinlock);
 	cl->next = ktime_to_ns(ktime_get());
@@ -693,6 +708,7 @@ static int iso_rl_change_class(struct Qdisc *sch, u32 classid,
 
 	cl->conf_rate_tt.rate_bps = (u64)hopt->rate.rate << 3;
 	iso_rl_set_rate(cl, cl->conf_rate_tt.rate_bps);
+	cl->rcp.capacity_mbps = cl->conf_rate_tt.rate_bps / 1000000;
 	iso_set_enforced_rate(cl);
 
 	sch_tree_unlock(sch);
@@ -1098,6 +1114,8 @@ static int mq_dump_class_stats(struct Qdisc *sch, unsigned long _cl,
 		r.bps = (cl->tx_rate_est.rate_mbps * 1000000) >> 3;
 		r.pps = 1;
 
+		printk(KERN_INFO "cl: %p, rcp: (cap: %u, fair: %u, util: %u)\n",
+		       cl, cl->rcp.capacity_mbps, cl->rcp.fair_share_mbps, cl->rcp.util->rate_mbps);
 		return gnet_stats_copy_rate_est(d, NULL, &r);
 	}
 
