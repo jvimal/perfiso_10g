@@ -27,6 +27,8 @@
 #define ONE_GBPS (1LLU * 1000 * 1000 * 1000)
 #define TEN_GBPS (10 * ONE_GBPS)
 #define RL_DIRECT ((struct iso_rl_class *)-1L)
+#define RL_MIN_PRIO (1)
+#define RL_MAX_PRIO (10)
 #define HTB_VER (0x30011)
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -553,6 +555,7 @@ void iso_set_enforced_rate(struct iso_rl_class *cl)
 {
 	cl->rate_to_time.rate_bps = min(cl->conf_rate_tt.rate_bps,
 					cl->wshare_rate_tt.rate_bps);
+	cl->rcp.capacity_mbps = cl->rate_to_time.rate_bps / 1000000;
 	prl_precompute_ratedata(&cl->rate_to_time);
 	cl->quanta = l2t_ns(&cl->rate_to_time,
 			    ISO_QUANTUM_BYTES);
@@ -709,6 +712,13 @@ static int iso_rl_change_class(struct Qdisc *sch, u32 classid,
 	cl->conf_rate_tt.rate_bps = (u64)hopt->rate.rate << 3;
 	iso_rl_set_rate(cl, cl->conf_rate_tt.rate_bps);
 	cl->rcp.capacity_mbps = cl->conf_rate_tt.rate_bps / 1000000;
+
+	if (hopt->prio < RL_MIN_PRIO)
+		hopt->prio = RL_MIN_PRIO;
+	if (hopt->prio > RL_MAX_PRIO)
+		hopt->prio = RL_MAX_PRIO;
+	cl->weight = hopt->prio;
+
 	iso_set_enforced_rate(cl);
 
 	sch_tree_unlock(sch);
