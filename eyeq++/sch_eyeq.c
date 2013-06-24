@@ -1124,8 +1124,10 @@ static int mq_dump_class_stats(struct Qdisc *sch, unsigned long _cl,
 		r.bps = (cl->tx_rate_est.rate_mbps * 1000000) >> 3;
 		r.pps = 1;
 
+		/*
 		printk(KERN_INFO "cl: %p, rcp: (cap: %u, fair: %u, util: %u)\n",
 		       cl, cl->rcp.capacity_mbps, cl->rcp.fair_share_mbps, cl->rcp.util->rate_mbps);
+		*/
 		return gnet_stats_copy_rate_est(d, NULL, &r);
 	}
 
