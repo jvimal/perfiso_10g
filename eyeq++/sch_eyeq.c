@@ -25,6 +25,7 @@
 
 #define ISO_QUANTUM_BYTES (65536)
 #define ONE_GBPS (1LLU * 1000 * 1000 * 1000)
+#define TEN_GBPS (10 * ONE_GBPS)
 #define RL_DIRECT ((struct iso_rl_class *)-1L)
 #define HTB_VER (0x30011)
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
@@ -100,6 +101,8 @@ struct iso_rl_class {
 	struct rate_est rate_est;
 
 	struct iso_rate_cfg rate_to_time;
+	struct iso_rate_cfg conf_rate_tt;
+	struct iso_rate_cfg wshare_rate_tt;
 
 	/* Protects the following two quantities. */
 	spinlock_t spinlock;
@@ -529,15 +532,27 @@ static void prl_precompute_ratedata(struct iso_rate_cfg *r)
 
 void iso_rl_set_rate(struct iso_rl_class *cl, u64 rate_bps)
 {
-	cl->rate_to_time.rate_bps = rate_bps;
+	cl->conf_rate_tt.rate_bps = rate_bps;
+	prl_precompute_ratedata(&cl->conf_rate_tt);
+	cl->quanta = l2t_ns(&cl->conf_rate_tt, ISO_QUANTUM_BYTES);
+}
+
+void iso_set_enforced_rate(struct iso_rl_class *cl)
+{
+	cl->rate_to_time.rate_bps = min(cl->conf_rate_tt.rate_bps,
+					cl->wshare_rate_tt.rate_bps);
 	prl_precompute_ratedata(&cl->rate_to_time);
-	cl->quanta = l2t_ns(&cl->rate_to_time, ISO_QUANTUM_BYTES);
+	cl->quanta = l2t_ns(&cl->rate_to_time,
+			    ISO_QUANTUM_BYTES);
 }
 
 int iso_rl_class_init(struct iso_rl_class *cl)
 {
 	int i;
 	iso_rl_set_rate(cl, ONE_GBPS);
+	cl->wshare_rate_tt.rate_bps = TEN_GBPS;
+	iso_set_enforced_rate(cl);
+
 	cl->weight = 1;
 	if (rate_est_init(&cl->rate_est))
 		goto enobufs1;
@@ -676,8 +691,9 @@ static int iso_rl_change_class(struct Qdisc *sch, u32 classid,
 		qdisc_class_hash_insert(&global->clhash, &cl->common);
 	}
 
-	cl->rate_to_time.rate_bps = (u64)hopt->rate.rate << 3;
-	iso_rl_set_rate(cl, cl->rate_to_time.rate_bps);
+	cl->conf_rate_tt.rate_bps = (u64)hopt->rate.rate << 3;
+	iso_rl_set_rate(cl, cl->conf_rate_tt.rate_bps);
+	iso_set_enforced_rate(cl);
 
 	sch_tree_unlock(sch);
 
