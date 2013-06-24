@@ -15,21 +15,19 @@ struct rate_est {
 };
 
 /* API */
-int rate_est_init(struct rate_est *);
+int rate_est_init(struct rate_est *, int period_us);
 void rate_est_free(struct rate_est *);
 static inline
 struct rate_pcpu_stats *get_cpu_stats(struct rate_est *r);
 void rate_est_update(struct rate_est *r, u64 bytes);
 void rate_est_aggregate(struct rate_est *r);
 
-int rate_est_init(struct rate_est *r)
+int rate_est_init(struct rate_est *r, int period_us)
 {
 	int cpu;
 	r->rate_mbps = 0;
 	r->last_aggregated = ktime_get();
-
-	/* rate estimates over 10ms */
-	r->period_us = 10000;
+	r->period_us = period_us;
 	r->bytes = 0;
 	r->rate_stats = alloc_percpu(struct rate_pcpu_stats);
 

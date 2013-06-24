@@ -98,7 +98,7 @@ struct iso_rl_class {
 	int refcnt;
 
 	u32 weight;
-	struct rate_est rate_est;
+	struct rate_est tx_rate_est;
 
 	struct iso_rate_cfg rate_to_time;
 	struct iso_rate_cfg conf_rate_tt;
@@ -378,7 +378,7 @@ iso_rl_dequeue(struct iso_rl_queue *q, u64 now,
 
 	q->qstats.backlog -= size;
 	q->qstats.qlen--;
-	rate_est_update(&q->rl->rate_est, size);
+	rate_est_update(&q->rl->tx_rate_est, size);
 timeout:
 	if (skq->qlen == 0) {
 		iso_rl_deactivate_queue(q);
@@ -433,7 +433,7 @@ iso_rl_dequeue_tree(struct iso_rl_queue *q, u64 now,
 			q->tokens -= l2t_ns(rlrate, qdisc_pkt_len(skb));
 			curr->deficit -= qdisc_pkt_len(skb);
 			bstats_update(&q->bstats, skb);
-			rate_est_update(&q->rl->rate_est, qdisc_pkt_len(skb));
+			rate_est_update(&q->rl->tx_rate_est, qdisc_pkt_len(skb));
 			return skb;
 		}
 	}
@@ -554,7 +554,7 @@ int iso_rl_class_init(struct iso_rl_class *cl)
 	iso_set_enforced_rate(cl);
 
 	cl->weight = 1;
-	if (rate_est_init(&cl->rate_est))
+	if (rate_est_init(&cl->tx_rate_est, USEC_PER_SEC))
 		goto enobufs1;
 
 	spin_lock_init(&cl->spinlock);
@@ -593,7 +593,7 @@ int iso_rl_class_init(struct iso_rl_class *cl)
 
 	return 0;
 enobufs2:
-	rate_est_free(&cl->rate_est);
+	rate_est_free(&cl->tx_rate_est);
 enobufs1:
 	return -ENOBUFS;
 }
@@ -721,7 +721,7 @@ static void iso_rl_destroy_class(struct Qdisc *sch, struct iso_rl_class *cl)
 		free_percpu(cl->queue);
 	}
 
-	rate_est_free(&cl->rate_est);
+	rate_est_free(&cl->tx_rate_est);
 	kfree(cl);
 }
 
@@ -1095,7 +1095,7 @@ static int mq_dump_class_stats(struct Qdisc *sch, unsigned long _cl,
 			return -1;
 
 		/* grr, bps = bytes/sec */
-		r.bps = (cl->rate_est.rate_mbps * 1000000) >> 3;
+		r.bps = (cl->tx_rate_est.rate_mbps * 1000000) >> 3;
 		r.pps = 1;
 
 		return gnet_stats_copy_rate_est(d, NULL, &r);
