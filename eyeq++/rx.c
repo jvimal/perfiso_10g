@@ -2,6 +2,11 @@
 #include "rx.h"
 #include "params.h"
 
+u32 iso_class_hash(iso_class_t klass)
+{
+	return jhash_1word(klass, 0xdeadbeef);
+}
+
 int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 {
 	int ret = 0;
@@ -55,7 +60,23 @@ rx_handler_result_t iso_rx_handler(struct sk_buff **pskb)
 int iso_rxcl_install(char *_klass, struct iso_rx_context *ctx)
 {
 	iso_class_t klass = iso_class_parse(_klass);
-	return 0;
+	struct iso_rx_class *cl;
+	int ret = 0;
+
+	cl = iso_rxcl_find(klass, ctx);
+	if (cl != NULL) {
+		ret = -EEXIST;
+		goto err;
+	}
+
+	cl = iso_rxcl_alloc(ctx, klass);
+	if (cl == NULL) {
+		ret = -ENOBUFS;
+		goto err;
+	}
+
+err:
+	return ret;
 }
 
 int iso_rx(struct iso_rx_context *ctx, struct sk_buff *skb)

@@ -71,10 +71,6 @@ rx_handler_result_t iso_rx_handler(struct sk_buff **);
 int iso_rx(struct iso_rx_context *ctx, struct sk_buff *skb);
 
 struct iso_rx_class *iso_rxcl_alloc(struct iso_rx_context *ctx, iso_class_t klass);
-static u32 iso_class_hash(iso_class_t klass)
-{
-	return jhash_1word(klass, 0xdeadbeef);
-}
 
 iso_class_t iso_class_parse(char *buff);
 struct iso_rx_class *iso_rxcl_find(iso_class_t klass,
