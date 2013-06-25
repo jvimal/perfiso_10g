@@ -56,14 +56,13 @@ struct iso_rx_class {
 
 // init function to set up receive path handler
 int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev);
+void iso_rxctx_free(struct iso_rx_context *ctx);
 
 // exit function to remove rx path handler
 
-// init function for rx_class
+// init/free function for rx_class
 int iso_rxcl_init(struct iso_rx_class *cl);
 void iso_rxcl_free(struct iso_rx_class *cl);
-
-// free function for rx_class
 
 // sysfs to allow configuration on receive path
 

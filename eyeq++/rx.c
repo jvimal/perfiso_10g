@@ -30,6 +30,17 @@ err:
 	return ret;
 }
 
+void iso_rxctx_free(struct iso_rx_context *ctx)
+{
+	struct iso_rx_class *cl, *clnext;
+
+	list_for_each_entry_safe(cl, clnext, &ctx->cl_list, list_node)
+	{
+		iso_rxcl_free(cl);
+	}
+	return;
+}
+
 struct iso_rx_context *iso_rxctx_dev(const struct net_device *dev)
 {
 	struct Qdisc *qdisc = dev->qdisc;
