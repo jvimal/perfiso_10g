@@ -42,7 +42,7 @@
 #define HLIST_for_each_entry hlist_for_each_entry
 #define HLIST_for_each_entry_safe hlist_for_each_entry_safe
 #endif
-
+#include "common.h"
 #include "rate_est.h"
 #include "rcp.h"
 #include "rx.h"
@@ -900,7 +900,7 @@ static int mq_init(struct Qdisc *sch, struct nlattr *opt)
 		priv->qdiscs[ntx] = qdisc;
 	}
 
-	sch->flags |= TCQ_F_MQROOT;
+	sch->flags |= TCQ_F_MQROOT | TCQ_F_EYEQ;
 	return 0;
 
 err:

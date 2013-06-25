@@ -1,7 +1,6 @@
 #include "tx.h"
 #include "rx.h"
-
-int IsoGlobalEnabled = 0;
+#include "params.h"
 
 int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 {
@@ -53,8 +52,82 @@ rx_handler_result_t iso_rx_handler(struct sk_buff **pskb)
 	return RX_HANDLER_PASS;
 }
 
+int iso_rxcl_install(char *_klass, struct iso_rx_context *ctx)
+{
+	iso_class_t klass = iso_class_parse(_klass);
+	return 0;
+}
+
 int iso_rx(struct iso_rx_context *ctx, struct sk_buff *skb)
 {
 
 	return 0;
+}
+
+struct iso_rx_class *iso_rxcl_alloc(struct iso_rx_context *ctx, iso_class_t klass)
+{
+	struct iso_rx_class *cl = kmalloc(sizeof(struct iso_rx_class), GFP_KERNEL);
+	struct hlist_head *head;
+	u32 hash;
+
+	if (cl) {
+		cl->ctx = ctx;
+		cl->klass = klass;
+		if (iso_rxcl_init(cl))
+			goto free;
+		hash = iso_class_hash(klass);
+		head = &ctx->cl_hash[hash & (MAX_BUCKETS - 1)];
+
+		spin_lock(&ctx->lock);
+		hlist_add_head(&cl->hash_node, head);
+		list_add_tail(&cl->list_node, &ctx->cl_list);
+		spin_unlock(&ctx->lock);
+		return cl;
+	free:
+		iso_rxcl_free(cl);
+	}
+
+	return NULL;
+}
+
+int iso_rxcl_init(struct iso_rx_class *cl)
+{
+	if (rate_est_init(&cl->rx_rate_est,
+			  ISO_VQ_UPDATE_INTERVAL_US))
+		return -ENOBUFS;
+
+	rcp_init(&cl->rcp, ISO_VQ_DRAIN_RATE_MBPS,
+		 &cl->rx_rate_est, ISO_VQ_UPDATE_INTERVAL_US);
+	return 0;
+}
+
+void iso_rxcl_free(struct iso_rx_class *cl)
+{
+	rate_est_free(&cl->rx_rate_est);
+	list_del(&cl->list_node);
+	hlist_del(&cl->hash_node);
+	kfree(cl);
+}
+
+iso_class_t iso_class_parse(char *buff)
+{
+	u32 ret;
+	sscanf(buff, "%u", &ret);
+	return ret;
+}
+
+struct iso_rx_class *iso_rxcl_find(iso_class_t klass,
+				   struct iso_rx_context *rxctx)
+{
+	u32 hash = iso_class_hash(klass);
+	struct hlist_head *head = &rxctx->cl_hash[hash & (MAX_BUCKETS - 1)];
+	struct hlist_node *node;
+	struct iso_rx_class *cl;
+
+	hlist_for_each_entry(cl, node, head, hash_node) {
+		if (cl->klass == klass)
+			return cl;
+	}
+
+	return NULL;
 }
