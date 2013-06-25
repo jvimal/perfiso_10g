@@ -102,12 +102,8 @@ void iso_params_exit() {
 static DEFINE_SEMAPHORE(config_mutex);
 
 /*
- * Create a new RX context (vq) with a specific filter
- * If compiled with CLASS_DEV
- * echo -n eth0 > /sys/module/sch_eyeq/parameters/create_rx
- *
- * If compiled with CLASS_ETHER_SRC
- * echo -n dev eth0 00:00:00:00:01:01 classid a:b > /sys/module/sch_eyeq/parameters/create_rx
+ * Create a new RX Class with a specific filter.
+ * echo -n dev eth0 <tcp-port> classid a:b > /sys/module/sch_eyeq/parameters/create_rx
  *
  * The classid a:b should be the same as the same high-level classid
  * of the container on the tx-side.  On receiving feedback packets,
@@ -161,7 +157,6 @@ module_param_call(create_rx, iso_sys_create_rx, iso_sys_noget, NULL, S_IWUSR);
  * echo -n dev %s 00:00:00:00:01:01 weight <w>
  * > /sys/module/sch_eyeq/parameters/set_vq_weight
  */
-extern spinlock_t vq_spinlock;
 static int iso_sys_set_vq_weight(const char *val, struct kernel_param *kp) {
 	char _vqc[128], _devname[128];
 	iso_class_t vqclass;
@@ -218,13 +213,12 @@ module_param_call(set_vq_weight, iso_sys_set_vq_weight, iso_sys_noget, NULL, S_I
 /*
  * Set VQ's Rate (cap its rate in Mb/s)
  * echo -n dev %s 00:00:00:00:01:01 rate 1000
- * > /sys/module/sch_eyeq/parameters/set_vq_rate
+ * > /sys/module/sch_eyeq/parameters/set_rx_rate
  */
-extern spinlock_t vq_spinlock;
-static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
+static int iso_sys_set_rx_rate(const char *val, struct kernel_param *kp) {
 	char _vqc[128], _devname[128];
-	iso_class_t vqclass;
-	struct iso_rx_class *vq;
+	iso_class_t klass;
+	struct iso_rx_class *cl;
 	int n, ret = 0, rate;
 	struct iso_rx_context *rxctx;
 	struct net_device *dev = NULL;
@@ -246,10 +240,10 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 	}
 
 	rxctx = iso_rxctx_dev(dev);
-	vqclass = iso_class_parse(_vqc);
-	vq = iso_rxcl_find(vqclass, rxctx);
-	if(vq == NULL) {
-		printk(KERN_INFO "sch_eyeq: Could not find vq %s\n", _vqc);
+	klass = iso_class_parse(_vqc);
+	cl = iso_rxcl_find(klass, rxctx);
+	if(cl == NULL) {
+		printk(KERN_INFO "sch_eyeq: Could not find cl %s\n", _vqc);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -261,7 +255,9 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-	printk(KERN_INFO "sch_eyeq: Set rate %d for vq %s on dev %s\n",
+	cl->conf_rate = rate;
+
+	printk(KERN_INFO "sch_eyeq: Set max-rate %d for rx %s on dev %s\n",
 	       rate, _vqc, _devname);
  out:
 
@@ -270,7 +266,7 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 	return ret;
 }
 
-module_param_call(set_vq_rate, iso_sys_set_vq_rate, iso_sys_noget, NULL, S_IWUSR);
+module_param_call(set_rx_rate, iso_sys_set_rx_rate, iso_sys_noget, NULL, S_IWUSR);
 
 /*
  * Delete a VQ.

@@ -35,6 +35,8 @@ struct iso_rx_class {
 	struct iso_rx_class *parent;
 	struct rate_est rx_rate_est;
 	struct rcp rcp;
+	rate_t conf_rate;
+	rate_t wshare_rate;
 
 	enum rx_class_type cltype;
 	struct iso_rx_context *ctx;
