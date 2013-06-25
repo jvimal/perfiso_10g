@@ -1,12 +1,14 @@
 #ifndef __RATE_EST_H__
 #define __RATE_EST_H__
 
+typedef u32 rate_t;
+
 struct rate_pcpu_stats {
 	u64 bytes;
 };
 
 struct rate_est {
-	u32 rate_mbps;
+	rate_t rate_mbps;
 	ktime_t last_aggregated;
 	int period_us;
 	u64 bytes;

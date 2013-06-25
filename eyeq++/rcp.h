@@ -5,9 +5,9 @@
 #define RCP_MIN_RATE_MBPS (10LLU)
 
 struct rcp {
-	u32 capacity_mbps;
+	rate_t capacity_mbps;
 	struct rate_est *util;
-	u32 fair_share_mbps;
+	rate_t fair_share_mbps;
 	int period_us;
 
 	ktime_t last_computed;
@@ -29,7 +29,7 @@ void rcp_init(struct rcp *r,
 void rcp_update(struct rcp *r)
 {
 	ktime_t now = ktime_get();
-	u32 util_mbps;
+	rate_t util_mbps;
 	u64 num;
 
 	if (ktime_us_delta(now, r->last_computed) < r->period_us)
