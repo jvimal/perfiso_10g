@@ -1,6 +1,8 @@
 
 obj-m += sch_eyeq.o
 
+sch_eyeq-y := rx.o
+
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=`pwd`
 

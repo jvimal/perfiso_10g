@@ -45,16 +45,8 @@
 
 #include "rate_est.h"
 #include "rcp.h"
-
-struct mq_sched {
-	struct Qdisc *sch;
-	struct Qdisc		**qdiscs;
-	struct tcf_proto *filter_list;
-	struct Qdisc_class_hash clhash;
-
-	/* Default class */
-	int defcls;
-};
+#include "rx.h"
+#include "tx.h"
 
 struct iso_rate_cfg {
 	u64 rate_bps;
