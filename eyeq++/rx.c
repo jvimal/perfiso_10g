@@ -12,13 +12,18 @@ int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 	int ret = 0;
 	int i;
 
+	if (iso_rxcl_init(&ctx->root))
+		goto err;
+
+	ctx->root.cltype = RXCL_TOP;
+
 	rtnl_lock();
 	ret = netdev_rx_handler_register(dev, iso_rx_handler, NULL);
 	rtnl_unlock();
 	synchronize_net();
 
 	if (ret)
-		goto err;
+		goto err_free;
 
 	INIT_LIST_HEAD(&ctx->cl_list);
 	for (i = 0; i < MAX_BUCKETS; i++) {
@@ -26,6 +31,8 @@ int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 	}
 
 	return 0;
+err_free:
+	rate_est_free(&ctx->root.rx_rate_est);
 err:
 	return ret;
 }
@@ -107,6 +114,10 @@ struct iso_rx_class *iso_rxcl_alloc(struct iso_rx_context *ctx, iso_class_t klas
 		cl->klass = klass;
 		if (iso_rxcl_init(cl))
 			goto free;
+
+		cl->parent = &ctx->root;
+		cl->cltype = RXCL_CONTAINER;
+
 		hash = iso_class_hash(klass);
 		head = &ctx->cl_hash[hash & (MAX_BUCKETS - 1)];
 
@@ -130,6 +141,8 @@ int iso_rxcl_init(struct iso_rx_class *cl)
 
 	rcp_init(&cl->rcp, ISO_VQ_DRAIN_RATE_MBPS,
 		 &cl->rx_rate_est, ISO_VQ_UPDATE_INTERVAL_US);
+
+	cl->parent = NULL;
 	return 0;
 }
 

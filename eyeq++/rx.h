@@ -28,17 +28,6 @@ enum rx_class_type {
 	RXCL_INTER_TOR,
 };
 
-struct iso_rx_context {
-	/* list of classes.  For now we will have only one kind of
-	 * classifier (tcp port).  */
-
-	/* for a first try, we will only do inter-ToR fairness.  We
-	 * will do the split later. */
-	spinlock_t lock;
-	struct list_head cl_list;
-	struct hlist_head cl_hash[MAX_BUCKETS];
-};
-
 struct iso_rx_class {
 	struct hlist_node hash_node;
 	struct list_head list_node;
@@ -53,6 +42,19 @@ struct iso_rx_class {
 	u32 weight;
 };
 
+struct iso_rx_context {
+	/* list of classes.  For now we will have only one kind of
+	 * classifier (tcp port).  For the future, we will need a
+	 * similar tc-like flexible classification mechanism. */
+
+	/* for a first try, we will only do inter-ToR fairness.  We
+	 * will do the split later. */
+	spinlock_t lock;
+	struct list_head cl_list;
+	struct hlist_head cl_hash[MAX_BUCKETS];
+
+	struct iso_rx_class root;
+};
 
 // init function to set up receive path handler
 int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev);
