@@ -104,10 +104,10 @@ static DEFINE_SEMAPHORE(config_mutex);
 /*
  * Create a new RX context (vq) with a specific filter
  * If compiled with CLASS_DEV
- * echo -n eth0 > /sys/module/perfiso/parameters/create_vq
+ * echo -n eth0 > /sys/module/sch_eyeq/parameters/create_vq
  *
  * If compiled with CLASS_ETHER_SRC
- * echo -n dev eth0 00:00:00:00:01:01 > /sys/module/perfiso/parameters/create_vq
+ * echo -n dev eth0 00:00:00:00:01:01 > /sys/module/sch_eyeq/parameters/create_vq
  */
 static int iso_sys_create_vq(const char *val, struct kernel_param *kp) {
 	char buff[128];
@@ -139,7 +139,7 @@ static int iso_sys_create_vq(const char *val, struct kernel_param *kp) {
 	if(ret)
 		return -EINVAL;
 
-	printk(KERN_INFO "eyeq: created vq for class %s, dev %s\n", klass, devname);
+	printk(KERN_INFO "sch_eyeq: created vq for class %s, dev %s\n", klass, devname);
 	return 0;
 }
 
@@ -148,7 +148,7 @@ module_param_call(create_vq, iso_sys_create_vq, iso_sys_noget, NULL, S_IWUSR);
 /*
  * Set VQ's weight
  * echo -n dev %s 00:00:00:00:01:01 weight <w>
- * > /sys/module/perfiso/parameters/set_vq_weight
+ * > /sys/module/sch_eyeq/parameters/set_vq_weight
  */
 extern spinlock_t vq_spinlock;
 static int iso_sys_set_vq_weight(const char *val, struct kernel_param *kp) {
@@ -179,20 +179,20 @@ static int iso_sys_set_vq_weight(const char *val, struct kernel_param *kp) {
 	vqclass = iso_class_parse(_vqc);
 	vq = iso_rxcl_find(vqclass, rxctx);
 	if(vq == NULL) {
-		printk(KERN_INFO "perfiso: Could not find vq %s\n", _vqc);
+		printk(KERN_INFO "sch_eyeq: Could not find vq %s\n", _vqc);
 		ret = -EINVAL;
 		goto out;
 	}
 
 	if(weight < 0 || weight > 1024) {
-		printk(KERN_INFO "perfiso: Invalid weight.  Weight must lie in [1, 1024]\n");
+		printk(KERN_INFO "sch_eyeq: Invalid weight.  Weight must lie in [1, 1024]\n");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	vq->weight = (u64)weight;
 
-	printk(KERN_INFO "perfiso: Set weight %d for vq %s on dev %s\n",
+	printk(KERN_INFO "sch_eyeq: Set weight %d for vq %s on dev %s\n",
 	       weight, _vqc, _devname);
  out:
 
@@ -207,7 +207,7 @@ module_param_call(set_vq_weight, iso_sys_set_vq_weight, iso_sys_noget, NULL, S_I
 /*
  * Set VQ's Rate (cap its rate in Mb/s)
  * echo -n dev %s 00:00:00:00:01:01 rate 1000
- * > /sys/module/perfiso/parameters/set_vq_rate
+ * > /sys/module/sch_eyeq/parameters/set_vq_rate
  */
 extern spinlock_t vq_spinlock;
 static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
@@ -238,19 +238,19 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 	vqclass = iso_class_parse(_vqc);
 	vq = iso_rxcl_find(vqclass, rxctx);
 	if(vq == NULL) {
-		printk(KERN_INFO "perfiso: Could not find vq %s\n", _vqc);
+		printk(KERN_INFO "sch_eyeq: Could not find vq %s\n", _vqc);
 		ret = -EINVAL;
 		goto out;
 	}
 
 	if(rate < 0 || rate > ISO_VQ_DRAIN_RATE_MBPS) {
-		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in [0, %d]\n",
+		printk(KERN_INFO "sch_eyeq: Invalid rate.  Rate must lie in [0, %d]\n",
 		       ISO_VQ_DRAIN_RATE_MBPS);
 		ret = -EINVAL;
 		goto out;
 	}
 
-	printk(KERN_INFO "perfiso: Set rate %d for vq %s on dev %s\n",
+	printk(KERN_INFO "sch_eyeq: Set rate %d for vq %s on dev %s\n",
 	       rate, _vqc, _devname);
  out:
 
@@ -264,7 +264,7 @@ module_param_call(set_vq_rate, iso_sys_set_vq_rate, iso_sys_noget, NULL, S_IWUSR
 /*
  * Delete a VQ.
  * echo -n dev eth0 vq 00:00:00:00:01:01
- * > /sys/module/perfiso/parameters/delete_vq
+ * > /sys/module/sch_eyeq/parameters/delete_vq
  */
 static int iso_sys_delete_vq(const char *val, struct kernel_param *kp) {
 	char _rxc[128], _devname[128];
@@ -300,7 +300,7 @@ static int iso_sys_delete_vq(const char *val, struct kernel_param *kp) {
 
 	iso_rxcl_free(vq);
 
-	printk(KERN_INFO "perfiso: Delete vq %s on dev %s\n",
+	printk(KERN_INFO "sch_eyeq: Delete vq %s on dev %s\n",
 	       _rxc, _devname);
 
 out:
