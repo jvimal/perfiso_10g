@@ -153,11 +153,11 @@ static int iso_sys_create_rx(const char *val, struct kernel_param *kp) {
 module_param_call(create_rx, iso_sys_create_rx, iso_sys_noget, NULL, S_IWUSR);
 
 /*
- * Set VQ's weight
- * echo -n dev %s 00:00:00:00:01:01 weight <w>
- * > /sys/module/sch_eyeq/parameters/set_vq_weight
+ * Set rx class's weight
+ * echo -n dev %s <class> weight <w>
+ * > /sys/module/sch_eyeq/parameters/set_rx_weight
  */
-static int iso_sys_set_vq_weight(const char *val, struct kernel_param *kp) {
+static int iso_sys_set_rx_weight(const char *val, struct kernel_param *kp) {
 	char _vqc[128], _devname[128];
 	iso_class_t vqclass;
 	struct iso_rx_class *vq;
@@ -207,19 +207,29 @@ static int iso_sys_set_vq_weight(const char *val, struct kernel_param *kp) {
 	return ret;
 }
 
-module_param_call(set_vq_weight, iso_sys_set_vq_weight, iso_sys_noget, NULL, S_IWUSR);
+module_param_call(set_rx_weight, iso_sys_set_rx_weight, iso_sys_noget, NULL, S_IWUSR);
 
+
+static int iso_rate_ok(int rate)
+{
+	if(rate < 0 || rate > ISO_VQ_DRAIN_RATE_MBPS) {
+		printk(KERN_INFO "sch_eyeq: Invalid rate.  Rate must lie in [0, %d]\n",
+		       ISO_VQ_DRAIN_RATE_MBPS);
+		return -EINVAL;
+	}
+	return 0;
+}
 
 /*
- * Set VQ's Rate (cap its rate in Mb/s)
- * echo -n dev %s 00:00:00:00:01:01 rate 1000
+ * Set VQ's min/max rate in Mb/s
+ * echo -n dev %s 00:00:00:00:01:01 minrate 1000 maxrate 10000
  * > /sys/module/sch_eyeq/parameters/set_rx_rate
  */
 static int iso_sys_set_rx_rate(const char *val, struct kernel_param *kp) {
 	char _vqc[128], _devname[128];
 	iso_class_t klass;
 	struct iso_rx_class *cl;
-	int n, ret = 0, rate;
+	int n, ret = 0, minrate, maxrate;
 	struct iso_rx_context *rxctx;
 	struct net_device *dev = NULL;
 
@@ -227,8 +237,8 @@ static int iso_sys_set_rx_rate(const char *val, struct kernel_param *kp) {
 		return -EINVAL;
 
 	rcu_read_lock();
-	n = sscanf(val, "dev %s %s rate %d", _devname, _vqc, &rate);
-	if(n != 3) {
+	n = sscanf(val, "dev %s %s minrate %d maxrate %d", _devname, _vqc, &minrate, &maxrate);
+	if(n != 4) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -248,17 +258,12 @@ static int iso_sys_set_rx_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-	if(rate < 0 || rate > ISO_VQ_DRAIN_RATE_MBPS) {
-		printk(KERN_INFO "sch_eyeq: Invalid rate.  Rate must lie in [0, %d]\n",
-		       ISO_VQ_DRAIN_RATE_MBPS);
-		ret = -EINVAL;
-		goto out;
+	if (iso_rate_ok(minrate) && iso_rate_ok(maxrate)) {
+		cl->conf_min_rate = minrate;
+		cl->conf_max_rate = maxrate;
+		printk(KERN_INFO "sch_eyeq: Set minrate %d maxrate %d for rx %s on dev %s\n",
+		       minrate, maxrate, _vqc, _devname);
 	}
-
-	cl->conf_rate = rate;
-
-	printk(KERN_INFO "sch_eyeq: Set max-rate %d for rx %s on dev %s\n",
-	       rate, _vqc, _devname);
  out:
 
 	rcu_read_unlock();

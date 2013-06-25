@@ -143,6 +143,10 @@ int iso_rxcl_init(struct iso_rx_class *cl)
 		 &cl->rx_rate_est, ISO_VQ_UPDATE_INTERVAL_US);
 
 	cl->parent = NULL;
+
+	cl->conf_min_rate = ISO_MIN_RFAIR;
+	cl->conf_max_rate = ISO_VQ_DRAIN_RATE_MBPS;
+	cl->wshare_rate = cl->conf_max_rate;
 	return 0;
 }
 
