@@ -50,7 +50,7 @@ void iso_params_exit(void);
 int iso_enabled(struct net_device *dev);
 
 extern struct iso_rx_context *iso_rxctx_dev(const struct net_device *dev);
-extern int iso_rxcl_install(char *_klass, struct iso_rx_context *ctx);
+extern int iso_rxcl_install(char *_klass, u32 classid, struct iso_rx_context *ctx);
 
 #endif /* __PARAMS_H__ */
 

@@ -40,6 +40,7 @@ struct iso_rx_class {
 	struct iso_rx_context *ctx;
 	iso_class_t klass;
 	u32 weight;
+	u32 classid;
 };
 
 struct iso_rx_context {

@@ -104,18 +104,24 @@ static DEFINE_SEMAPHORE(config_mutex);
 /*
  * Create a new RX context (vq) with a specific filter
  * If compiled with CLASS_DEV
- * echo -n eth0 > /sys/module/sch_eyeq/parameters/create_vq
+ * echo -n eth0 > /sys/module/sch_eyeq/parameters/create_rx
  *
  * If compiled with CLASS_ETHER_SRC
- * echo -n dev eth0 00:00:00:00:01:01 > /sys/module/sch_eyeq/parameters/create_vq
+ * echo -n dev eth0 00:00:00:00:01:01 classid a:b > /sys/module/sch_eyeq/parameters/create_rx
+ *
+ * The classid a:b should be the same as the same high-level classid
+ * of the container on the tx-side.  On receiving feedback packets,
+ * this value is used to program the rate limiters on the transmit
+ * side.
  */
-static int iso_sys_create_vq(const char *val, struct kernel_param *kp) {
+static int iso_sys_create_rx(const char *val, struct kernel_param *kp) {
 	char buff[128];
 	char devname[128];
 	char klass[128];
 	struct iso_rx_context *rxctx;
 	struct net_device *dev = NULL;
 	int len, ret;
+	u32 major, minor, classid;
 
 	len = min(127, (int)strlen(val));
 	strncpy(buff, val, len);
@@ -124,12 +130,17 @@ static int iso_sys_create_vq(const char *val, struct kernel_param *kp) {
 	if(down_interruptible(&config_mutex))
 		return -EINVAL;
 
-	sscanf(buff, "dev %s %s", devname, klass);
+	ret = sscanf(buff, "dev %s %s classid %u:%u", devname, klass, &major, &minor);
+	if (ret != 4)
+		return -EINVAL;
+
 	rcu_read_lock();
 	dev = iso_search_netdev(devname);
+	classid = TC_H_MAKE(major, minor);
+
 	if (dev && iso_enabled(dev)) {
 		rxctx = iso_rxctx_dev(dev);
-		ret = iso_rxcl_install(klass, rxctx);
+		ret = iso_rxcl_install(klass, classid, rxctx);
 	} else {
 		ret = -EINVAL;
 	}
@@ -139,11 +150,11 @@ static int iso_sys_create_vq(const char *val, struct kernel_param *kp) {
 	if(ret)
 		return -EINVAL;
 
-	printk(KERN_INFO "sch_eyeq: created vq for class %s, dev %s\n", klass, devname);
+	printk(KERN_INFO "sch_eyeq: created rx for class %s, dev %s\n", klass, devname);
 	return 0;
 }
 
-module_param_call(create_vq, iso_sys_create_vq, iso_sys_noget, NULL, S_IWUSR);
+module_param_call(create_rx, iso_sys_create_rx, iso_sys_noget, NULL, S_IWUSR);
 
 /*
  * Set VQ's weight

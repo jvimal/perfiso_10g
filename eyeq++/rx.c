@@ -75,7 +75,7 @@ rx_handler_result_t iso_rx_handler(struct sk_buff **pskb)
 	return RX_HANDLER_PASS;
 }
 
-int iso_rxcl_install(char *_klass, struct iso_rx_context *ctx)
+int iso_rxcl_install(char *_klass, u32 classid, struct iso_rx_context *ctx)
 {
 	iso_class_t klass = iso_class_parse(_klass);
 	struct iso_rx_class *cl;
@@ -92,7 +92,7 @@ int iso_rxcl_install(char *_klass, struct iso_rx_context *ctx)
 		ret = -ENOBUFS;
 		goto err;
 	}
-
+	cl->classid = classid;
 err:
 	return ret;
 }
