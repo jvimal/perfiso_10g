@@ -332,3 +332,5 @@ int iso_enabled(struct net_device *dev) {
 /* Local Variables: */
 /* indent-tabs-mode:t */
 /* End: */
+
+MODULE_LICENSE("GPL");

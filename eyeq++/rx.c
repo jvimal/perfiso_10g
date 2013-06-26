@@ -180,3 +180,5 @@ struct iso_rx_class *iso_rxcl_find(iso_class_t klass,
 
 	return NULL;
 }
+
+MODULE_LICENSE("GPL");
