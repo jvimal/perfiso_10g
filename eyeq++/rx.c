@@ -15,6 +15,11 @@ int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 	ctx->initialized = 0;
 	ctx->dev = dev;
 
+	INIT_LIST_HEAD(&ctx->cl_list);
+	for (i = 0; i < MAX_BUCKETS; i++) {
+		INIT_HLIST_HEAD(&ctx->cl_hash[i]);
+	}
+
 	if (iso_rxcl_init(&ctx->root))
 		goto err;
 
@@ -23,18 +28,13 @@ int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 	ret = netdev_rx_handler_register(dev, iso_rx_handler, NULL);
 	synchronize_net();
 
-	if (ret)
-		goto err_free;
-
-	INIT_LIST_HEAD(&ctx->cl_list);
-	for (i = 0; i < MAX_BUCKETS; i++) {
-		INIT_HLIST_HEAD(&ctx->cl_hash[i]);
+	if (ret) {
+		printk(KERN_INFO "Couldn't register rx handler\n");
+		goto err;
 	}
 
 	ctx->initialized = 1;
 	return 0;
-err_free:
-	rate_est_free(&ctx->root.rx_rate_est);
 err:
 	return ret;
 }
@@ -42,11 +42,12 @@ err:
 void iso_rxctx_free(struct iso_rx_context *ctx)
 {
 	struct iso_rx_class *cl, *clnext;
-
-	if (ctx->initialized) {
-		netdev_rx_handler_unregister(ctx->dev);
-		rate_est_free(&ctx->root.rx_rate_est);
-	}
+	printk(KERN_INFO "%s\n", __FUNCTION__);
+	ctx->initialized = 0;
+	smp_mb();
+	netdev_rx_handler_unregister(ctx->dev);
+	synchronize_rcu();
+	rate_est_free(&ctx->root.rx_rate_est);
 
 	list_for_each_entry_safe(cl, clnext, &ctx->cl_list, list_node)
 	{
@@ -74,6 +75,9 @@ rx_handler_result_t iso_rx_handler(struct sk_buff **pskb)
 		return RX_HANDLER_PASS;
 
 	rxctx = iso_rxctx_dev(skb->dev);
+	if (unlikely(rxctx->initialized == 0))
+		return RX_HANDLER_PASS;
+
 	if (iso_rx(rxctx, skb)) {
 		kfree_skb(skb);
 		return RX_HANDLER_CONSUMED;
@@ -106,6 +110,23 @@ err:
 
 int iso_rx(struct iso_rx_context *ctx, struct sk_buff *skb)
 {
+	struct iso_rx_class *cl = &ctx->root;
+	struct iso_rx_class *clchild;
+	rate_t *fb_rate = EYEQ_FB(skb);
+	u32 bytes = skb->len;
+	rate_est_update(&cl->rx_rate_est, bytes);
+	rcp_update(&cl->rcp);
+
+	if (net_ratelimit())
+		printk(KERN_INFO "rx-rate-est: %u\n",
+		       cl->rx_rate_est.rate_mbps);
+	/*
+	while (cl type != RXCL_CONTAINER) {
+		clchild = classify to cl->children;
+		update clchild rcp loop;
+		set fb_rate to min(fb_rate, chchild->rcp->rate);
+	}
+	*/
 
 	return 0;
 }

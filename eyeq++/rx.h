@@ -18,7 +18,7 @@
 MODULE_LICENSE("GPL");
 
 #include "rcp.h"
-
+#define EYEQ_FB(skb) ((rate_t *)(skb)->cb)
 #define MAX_BUCKETS (2048)
 typedef u32 iso_class_t;
 

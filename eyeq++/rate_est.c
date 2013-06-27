@@ -26,6 +26,7 @@ void rate_est_free(struct rate_est *r)
 {
 	if (r->rate_stats != NULL)
 		free_percpu(r->rate_stats);
+	r->rate_stats = NULL;
 }
 
 inline

@@ -34,7 +34,7 @@
 #error "Mismatched sch_htb.c and pkt_sch.h"
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,8,0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3,9,0)
 #define HLIST_for_each_entry(a,b,c,d) hlist_for_each_entry(a,c,d)
 #define HLIST_for_each_entry_safe(a,b,c,d,e) hlist_for_each_entry_safe(a,c,d,e)
 #else
@@ -804,10 +804,12 @@ static void mq_destroy(struct Qdisc *sch)
 #endif
 	unsigned int ntx, i;
 
-	if (!priv->qdiscs)
-		return;
-
 	iso_rxctx_free(&priv->rx);
+
+	if (!priv->qdiscs) {
+		printk(KERN_INFO "%s %s, priv->qdiscs %p\n", __FUNCTION__, dev->name, priv->qdiscs);
+		return;
+	}
 
 	for (ntx = 0; ntx < dev->num_tx_queues && priv->qdiscs[ntx]; ntx++)
 		qdisc_destroy(priv->qdiscs[ntx]);
