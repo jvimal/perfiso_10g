@@ -117,9 +117,6 @@ int iso_rx(struct iso_rx_context *ctx, struct sk_buff *skb)
 	rate_est_update(&cl->rx_rate_est, bytes);
 	rcp_update(&cl->rcp);
 
-	if (net_ratelimit())
-		printk(KERN_INFO "rx-rate-est: %u\n",
-		       cl->rx_rate_est.rate_mbps);
 	/*
 	while (cl type != RXCL_CONTAINER) {
 		clchild = classify to cl->children;
