@@ -73,7 +73,7 @@ class Parameters:
     def __str__(self, pad=True):
         ret = []
         i = 0
-        for k,v in self.params.iteritems():
+        for k,v in sorted(self.params.iteritems()):
             i += 1
             if pad:
                 ret.append("%2s %40s %10s" % (i, k, v))
