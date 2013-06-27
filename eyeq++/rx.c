@@ -51,6 +51,7 @@ void iso_rxctx_free(struct iso_rx_context *ctx)
 
 	list_for_each_entry_safe(cl, clnext, &ctx->cl_list, list_node)
 	{
+		printk(KERN_INFO "freeing class %p, classid %x\n", cl, cl->classid);
 		iso_rxcl_free(cl);
 	}
 	return;
