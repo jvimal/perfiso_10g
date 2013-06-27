@@ -807,6 +807,8 @@ static void mq_destroy(struct Qdisc *sch)
 	if (!priv->qdiscs)
 		return;
 
+	iso_rxctx_free(&priv->rx);
+
 	for (ntx = 0; ntx < dev->num_tx_queues && priv->qdiscs[ntx]; ntx++)
 		qdisc_destroy(priv->qdiscs[ntx]);
 
@@ -899,6 +901,10 @@ static int mq_init(struct Qdisc *sch, struct nlattr *opt)
 		cb->max_direct_qlen = tx_queue_len;
 		priv->qdiscs[ntx] = qdisc;
 	}
+
+	/* Enable the receive path */
+	if (iso_rxctx_init(&priv->rx, dev))
+		goto err;
 
 	sch->flags |= TCQ_F_MQROOT | TCQ_F_EYEQ;
 	return 0;
@@ -1204,16 +1210,17 @@ struct Qdisc_ops mq_qdisc_ops __read_mostly = {
 	.owner		= THIS_MODULE,
 };
 
-static int __init htb_module_init(void)
+static int __init eyeq_module_init(void)
 {
+	printk(KERN_INFO "Registering EyeQ\n");
 	return register_qdisc(&mq_qdisc_ops);
 }
 
-static void __exit htb_module_exit(void)
+static void __exit eyeq_module_exit(void)
 {
 	unregister_qdisc(&mq_qdisc_ops);
 }
 
-module_init(htb_module_init);
-module_exit(htb_module_exit);
+module_init(eyeq_module_init);
+module_exit(eyeq_module_exit);
 MODULE_LICENSE("GPL");
