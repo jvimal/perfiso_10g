@@ -12,14 +12,15 @@ int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 	int ret = 0;
 	int i;
 
+	ctx->initialized = 0;
+	ctx->dev = dev;
+
 	if (iso_rxcl_init(&ctx->root))
 		goto err;
 
 	ctx->root.cltype = RXCL_TOP;
 
-	rtnl_lock();
 	ret = netdev_rx_handler_register(dev, iso_rx_handler, NULL);
-	rtnl_unlock();
 	synchronize_net();
 
 	if (ret)
@@ -30,6 +31,7 @@ int iso_rxctx_init(struct iso_rx_context *ctx, struct net_device *dev)
 		INIT_HLIST_HEAD(&ctx->cl_hash[i]);
 	}
 
+	ctx->initialized = 1;
 	return 0;
 err_free:
 	rate_est_free(&ctx->root.rx_rate_est);
@@ -40,6 +42,11 @@ err:
 void iso_rxctx_free(struct iso_rx_context *ctx)
 {
 	struct iso_rx_class *cl, *clnext;
+
+	if (ctx->initialized) {
+		netdev_rx_handler_unregister(ctx->dev);
+		rate_est_free(&ctx->root.rx_rate_est);
+	}
 
 	list_for_each_entry_safe(cl, clnext, &ctx->cl_list, list_node)
 	{
@@ -181,4 +188,3 @@ struct iso_rx_class *iso_rxcl_find(iso_class_t klass,
 	return NULL;
 }
 
-MODULE_LICENSE("GPL");

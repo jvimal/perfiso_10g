@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/jhash.h>
+MODULE_LICENSE("GPL");
 
 #include "rcp.h"
 
@@ -58,6 +59,8 @@ struct iso_rx_context {
 	struct hlist_head cl_hash[MAX_BUCKETS];
 
 	struct iso_rx_class root;
+	int initialized;
+	struct net_device *dev;
 };
 
 // init function to set up receive path handler
