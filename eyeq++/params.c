@@ -28,7 +28,7 @@ const u8 ISO_FEEDBACK_PACKET_TTL = 64;
 int ISO_FEEDBACK_PACKET_IPPROTO = 143; // should be some unused protocol
 
 // New parameters
-int ISO_VQ_UPDATE_INTERVAL_US = 200;
+int ISO_VQ_UPDATE_INTERVAL_US = 500;
 int ISO_VQ_HRCP_US = 1000;
 
 struct iso_param iso_params[64] = {
