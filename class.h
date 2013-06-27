@@ -3,6 +3,7 @@
 
 
 #include <linux/skbuff.h>
+#include "rl.h"
 
 /*
  * Classification can be based on skb->dev, src hwaddr, ip, tcp, etc.
@@ -25,6 +26,11 @@ typedef u32 iso_class_t;
 #elif defined ISO_TX_CLASS_IPADDR || defined ISO_TX_CLASS_L4PORT
 typedef u32 iso_class_t;
 #endif
+struct rate_feedback {
+	u32 rate_mbps;
+	iso_class_t klass;
+	u32 magic;
+};
 
 /* Maybe we need an "ops" structure */
 static inline iso_class_t iso_txc_classify(struct sk_buff *);
@@ -33,7 +39,7 @@ static inline int iso_class_cmp(iso_class_t a, iso_class_t b);
 static inline u32 iso_class_hash(iso_class_t);
 static inline void iso_class_show(iso_class_t, char *);
 static inline iso_class_t iso_class_parse(char*);
-static inline struct iso_tx_class *iso_txc_find(iso_class_t, struct iso_tx_context *);
+// static inline struct iso_tx_class *iso_txc_find(iso_class_t, struct iso_tx_context *);
 
 
 /* First attempt: out device classification.  Its address is usually
@@ -209,18 +215,29 @@ static inline iso_class_t iso_rx_classify(struct sk_buff *skb) {
 static inline iso_class_t iso_txc_classify(struct sk_buff *skb) {
 	struct ethhdr *eth;
 	struct iphdr *iph;
+	struct tcphdr *tcph;
+	struct udphdr *udph;
+
 	u32 port = 0;
+	struct rate_feedback *fb;
 
 	eth = eth_hdr(skb);
 	if(likely(eth->h_proto == __constant_htons(ETH_P_IP))) {
 		iph = ip_hdr(skb);
 		switch (iph->protocol) {
 		case IPPROTO_TCP:
-			port = tcp_hdr(skb)->dest;
+			tcph = (struct tcphdr *)((u8 *)iph + iph->ihl*4);
+			port = tcph->dest;
 			break;
 
 		case IPPROTO_UDP:
-			port = udp_hdr(skb)->dest;
+			udph = (struct udphdr *)((u8 *)iph + iph->ihl*4);
+			port = udph->dest;
+			break;
+
+		case 143: // feedback
+			fb = (struct rate_feedback *)((u8 *)(iph) + iph->ihl * 4);
+			port = fb->klass;
 			break;
 		}
 	}

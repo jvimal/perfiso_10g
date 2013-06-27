@@ -49,12 +49,12 @@ int iso_vq_install(char *, struct iso_rx_context *);
 static inline int iso_generate_feedback(int bit, struct sk_buff *pkt);
 static inline int iso_is_generated_feedback(struct sk_buff *);
 
-
 /* Create a feebdack packet and prepare for transmission.  Returns 1 if successful. */
 static inline int iso_generate_feedback(int bit, struct sk_buff *pkt) {
 	struct sk_buff *skb;
 	struct ethhdr *eth_to, *eth_from;
 	struct iphdr *iph_to, *iph_from;
+	struct rate_feedback *fb;
 
 	eth_from = eth_hdr(pkt);
 	if(unlikely(eth_from->h_proto != __constant_htons(ETH_P_IP)))
@@ -86,7 +86,7 @@ static inline int iso_generate_feedback(int bit, struct sk_buff *pkt) {
 		iph_to->ihl = 5;
 		iph_to->version = 4;
 		iph_to->tos = 0x2 | (bit ? ISO_ECN_REFLECT_MASK : 0);
-		iph_to->tot_len = __constant_htons(ISO_FEEDBACK_HEADER_SIZE);
+		iph_to->tot_len = __constant_htons(sizeof(struct iphdr) + 30);
 		iph_to->id = bit; //iph_from->id;
 		iph_to->frag_off = 0;
 		iph_to->ttl = ISO_FEEDBACK_PACKET_TTL;
@@ -97,6 +97,10 @@ static inline int iso_generate_feedback(int bit, struct sk_buff *pkt) {
 		/* NB: this function doesn't "send" the packet */
 		ip_send_check(iph_to);
 
+		fb = (struct rate_feedback *)(((u8 *)iph_to) + iph_to->ihl * 4);
+		fb->rate_mbps = bit;
+		fb->klass = iso_rx_classify(pkt);
+		fb->magic = 0xdeadbeef;
 #if defined(QDISC) || defined(DIRECT)
 		skb_push(skb, ETH_HLEN);
 #endif

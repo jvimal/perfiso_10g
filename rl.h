@@ -80,6 +80,8 @@ struct iso_rl_cb {
 	u64 tx_bytes;
 };
 
+#include "class.h"
+
 int iso_rl_prep(struct iso_rl_cb __percpu **rlcb);
 void iso_rl_exit(struct iso_rl_cb __percpu *rlcb);
 void iso_rl_xmit_tasklet(unsigned long _cb);
@@ -123,6 +125,7 @@ static inline int skb_set_feedback(struct sk_buff *skb) {
 static inline int skb_has_feedback(struct sk_buff *skb) {
 	struct ethhdr *eth;
 	struct iphdr *iph;
+	struct rate_feedback *fb;
 
 	eth = eth_hdr(skb);
 	if(unlikely(eth->h_proto != __constant_htons(ETH_P_IP)))
@@ -132,6 +135,8 @@ static inline int skb_has_feedback(struct sk_buff *skb) {
 	//return iph->tos & ISO_ECN_REFLECT_MASK;
 	if(unlikely(iph->protocol != ISO_FEEDBACK_PACKET_IPPROTO))
 		return 0;
+
+	fb = (struct rate_feedback *)((u8 *)(iph) + sizeof(*iph));
 	return iph->id;
 }
 
