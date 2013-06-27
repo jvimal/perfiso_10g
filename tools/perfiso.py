@@ -55,11 +55,12 @@ class Parameters:
         self.read()
 
     def read(self):
-        for p in glob.glob(ISO_SYSCTL_DIR + "*"):
+        self.params_list = []
+        for p in sorted(glob.glob(ISO_SYSCTL_DIR + "*")):
             name = os.path.basename(p)
             value = read_file(p)
             self.params[name] = value
-        self.params_list = list(self.params.iteritems())
+            self.params_list.append((name, value))
 
     def set(self, name='', value=''):
         if re_digits.match(name):
