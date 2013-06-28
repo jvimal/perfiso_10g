@@ -130,10 +130,8 @@ inline void iso_txc_tick(struct iso_tx_context *context) {
 
 			rl->rate = context->rate * txc->weight;
 			rl->rate = min_t(u64, ISO_MAX_TX_RATE, rl->rate);
-			rl->rate = max_t(u64, txc->min_rate, rl->rate);
-			if (txc->is_static) {
-				rl->rate = min_t(u64, txc->max_rate, rl->rate);
-			}
+			rl->rate = max_t(u64, txc->conf_min_rate, rl->rate);
+			rl->rate = min_t(u64, txc->conf_max_rate, rl->rate);
 		}
 	skip:
 		spin_unlock_irqrestore(&context->txc_spinlock, flags);
@@ -160,9 +158,9 @@ void iso_txc_show(struct iso_tx_class *txc, struct seq_file *s) {
 
 	seq_printf(s, "txc class %s   weight %d   assoc vq %s   freelist %d\n",
 		   buff, txc->weight, vqc, txc->freelist_count);
-	seq_printf(s, "txc rl tx_rate %u,%u   rate %u   min_rate %u   xmit %llu   queued %llu\n",
-		   txc->tx_rate, txc->tx_rate_smooth, txc->rl.rate, txc->min_rate,
-		   txc->rl.accum_xmit, txc->rl.accum_enqueued);
+	seq_printf(s, "txc rl tx_rate %u,%u   rate %u   min_rate %u   xmit %llu   queued %llu   max_rate %u\n",
+		   txc->tx_rate, txc->tx_rate_smooth, txc->rl.rate, txc->conf_min_rate,
+		   txc->rl.accum_xmit, txc->rl.accum_enqueued, txc->conf_max_rate);
 	iso_rl_show(&txc->rl, s);
 	seq_printf(s, "\n");
 
@@ -363,11 +361,9 @@ void iso_txc_init(struct iso_tx_class *txc) {
 	txc->weight = 1;
 	txc->active = 0;
 	txc->tx_rate = 0;
-	txc->min_rate = ISO_MAX_TX_RATE;
+	txc->conf_min_rate = 10;
+	txc->conf_max_rate = ISO_MAX_TX_RATE;
 	txc->tx_rate_smooth = 0;
-
-	txc->max_rate = ISO_MAX_TX_RATE;
-	txc->is_static = 0;
 
 	INIT_WORK(&txc->allocator, iso_txc_allocator);
 }

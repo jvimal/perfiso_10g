@@ -380,7 +380,7 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 	iso_class_t klass;
 	struct iso_tx_class *txc;
 	unsigned long flags;
-	int n, ret = 0, rate;
+	int n, ret = 0, minrate, maxrate, debug;
 	struct net_device *dev = NULL;
 	struct iso_tx_context *txctx;
 
@@ -388,8 +388,8 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 		return -EINVAL;
 
 	rcu_read_lock();
-	n = sscanf(val, "dev %s %s rate %d", _devname, _txc, &rate);
-	if(n != 3) {
+	n = sscanf(val, "dev %s %s minrate %d maxrate %d %d", _devname, _txc, &minrate, &maxrate, &debug);
+	if(n != 5) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -409,7 +409,8 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-	if(rate < 0 || rate > ISO_MAX_TX_RATE) {
+#define OK_TXC(rate) (((rate) > 0 && (rate) < ISO_MAX_TX_RATE))
+	if(!OK_TXC(minrate) || !OK_TXC(maxrate)) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in [1, %d]\n",
 		       ISO_MAX_TX_RATE);
 		ret = -EINVAL;
@@ -417,19 +418,15 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 	}
 
 	spin_lock_irqsave(&txc->writelock, flags);
-	if (rate == 0) {
-		txc->is_static = 0;
-		txc->max_rate = ISO_MAX_TX_RATE;
-	} else {
-		txc->is_static = 1;
-		txc->max_rate = rate;
-	}
+	txc->conf_min_rate = minrate;
+	txc->conf_max_rate = maxrate;
 	spin_unlock_irqrestore(&txc->writelock, flags);
 
 	iso_txc_recompute_rates(txctx);
 
-	printk(KERN_INFO "perfiso: Set rate %d (is_static? %d) for txc %s on dev %s\n",
-	       rate, txc->is_static, _txc, _devname);
+	if (debug)
+		printk(KERN_INFO "perfiso: Set minrate %d maxrate %d for txc %s on dev %s\n",
+		       minrate, maxrate, _txc, _devname);
  out:
 
 	rcu_read_unlock();
