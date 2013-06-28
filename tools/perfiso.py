@@ -89,6 +89,9 @@ class Parameters:
         for name,value in cfg.iteritems():
             self.set(name, value)
 
+    def get(self, name):
+        return self.params.get(name, None)
+
 class TxClass:
     def __init__(self):
         self.txcs = []
@@ -119,8 +122,9 @@ class TxClass:
         logging.info("Setting weight of txc %s on dev %s to %s" % (klass, dev, w))
         return cmd(c)
 
-    def set_rate(self, dev, klass, rate):
-        c = "echo dev %s %s rate %s > %s/set_txc_rate" % (dev, klass, rate, ISO_SYSFS)
+    def set_rate(self, dev, klass, minrate, maxrate):
+        # The '1 is for debug output in the kernel
+        c = "echo dev %s %s minrate %s maxrate %s %d > %s/set_txc_rate" % (dev, klass, minrate, maxrate, 1, ISO_SYSFS)
         return cmd(c)
 
     def clear_rate(self, dev, klass):
@@ -180,8 +184,11 @@ class VQ:
         c = "echo dev %s %s weight %s > %s/set_vq_weight" % (dev, klass, w, ISO_SYSFS)
         return cmd(c)
 
-    def set_rate(self, dev, klass, rate):
-        c = "echo dev %s %s rate %s > %s/set_vq_rate" % (dev, klass, rate, ISO_SYSFS)
+    def set_rate(self, dev, klass, minrate, maxrate):
+        # The last '1' is for debug flag
+        if maxrate is None:
+            maxrate = params.get('ISO_VQ_DRAIN_RATE_MBPS')
+        c = "echo dev %s %s minrate %s maxrate %s 1 > %s/set_vq_rate" % (dev, klass, minrate, maxrate, ISO_SYSFS)
         return cmd(c)
 
     def clear_rate(self, dev, klass):

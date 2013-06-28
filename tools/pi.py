@@ -78,11 +78,11 @@ parser.add_argument("--stats",
 
 parser.add_argument('--weight', '-w',
                     help="Relative weight of tenant.",
-                    default=1)
+                    default=None)
 
 parser.add_argument('--rate', '-r',
                     help="Relative weight of tenant.",
-                    default=-1)
+                    default=None)
 
 parser.add_argument("--one-gbe",
                     help="Default parameters for 1GbE.",
@@ -145,11 +145,18 @@ elif args.create_tenant or args.change_tenant:
         perfiso.txc.create(dev, tid)
         perfiso.vqs.create(dev, tid)
         perfiso.txc.associate(dev, tid, tid)
-    perfiso.txc.set_weight(dev, tid, args.weight)
-    perfiso.vqs.set_weight(dev, tid, args.weight)
-    if args.rate >= 0:
-        perfiso.txc.set_rate(dev, tid, args.rate)
-        perfiso.vqs.set_rate(dev, tid, args.rate)
+    if args.weight:
+        perfiso.txc.set_weight(dev, tid, args.weight)
+        perfiso.vqs.set_weight(dev, tid, args.weight)
+    if args.rate:
+        minrate = args.rate
+        if ',' in args.rate:
+            minrate, maxrate = map(int, args.split(',', 1))
+        else:
+            minrate = args.rate
+            maxrate = None
+        perfiso.txc.set_rate(dev, tid, minrate, maxrate)
+        perfiso.vqs.set_rate(dev, tid, minrate, maxrate)
 elif args.delete_tenant:
     tid = args.delete_tenant
     dev = args.dev
