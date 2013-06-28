@@ -409,7 +409,7 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-#define OK_TXC(rate) (((rate) > 0 && (rate) < ISO_MAX_TX_RATE))
+#define OK_TXC(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE + 20)))
 	if(!OK_TXC(minrate) || !OK_TXC(maxrate)) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in [1, %d]\n",
 		       ISO_MAX_TX_RATE);
@@ -541,7 +541,7 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-#define OK(rate) (((rate) > 0 && (rate) < ISO_VQ_DRAIN_RATE_MBPS))
+#define OK(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE+20)))
 	if(!OK(min_rate) || !OK(max_rate)) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in (0, %d]\n",
 		       ISO_VQ_DRAIN_RATE_MBPS);
