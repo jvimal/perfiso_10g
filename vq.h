@@ -48,9 +48,10 @@ struct iso_vq_stats {
 
 struct iso_vq {
 	u8 enabled;
-	u8 is_static;
 
 	u64 rate;
+	u64 conf_min_rate;
+	u64 conf_max_rate;
 	u64 total_bytes_queued;
 	u64 feedback_rate;
 	u64 rx_rate;

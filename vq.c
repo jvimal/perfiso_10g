@@ -67,8 +67,6 @@ void iso_vq_calculate_rates(struct iso_rx_context *rxctx) {
 
 	if(total_weight > 0) {
 		for_each_vq(vq, rxctx) {
-			if (vq->is_static)
-				continue;
 			vq->rate = ISO_VQ_DRAIN_RATE_MBPS * vq->weight / total_weight;
 		}
 	}
@@ -77,7 +75,6 @@ void iso_vq_calculate_rates(struct iso_rx_context *rxctx) {
 int iso_vq_init(struct iso_vq *vq) {
 	int i;
 	vq->enabled = 1;
-	vq->is_static = 0;
 	vq->rate = ISO_MIN_RFAIR;
 	vq->total_bytes_queued = 0;
 	vq->feedback_rate = ISO_MIN_RFAIR;
@@ -198,9 +195,8 @@ void iso_vq_drain(struct iso_vq *vq, u64 dt) {
 	rate = vq->weight * rxctx->rcp_rate;
 
 	/* If we want to cap a VQ's rate, do it now */
-	if (vq->is_static) {
-		rate = min_t(u64, rate, vq->rate);
-	}
+	rate = min_t(u64, rate, vq->conf_max_rate);
+	rate = max_t(u64, rate, vq->conf_min_rate);
 
 	/* The control algorithms */
 	{
@@ -261,10 +257,10 @@ void iso_vq_show(struct iso_vq *vq, struct seq_file *s) {
 
 	iso_class_show(vq->klass, buff);
 	seq_printf(s, "vq class %s   flags %d,%d   rate %llu  rx_rate %llu  fb_rate %llu  alpha %u/%u  "
-		   " backlog -   weight %llu   refcnt %d\n",
-		   buff, vq->enabled, vq->is_static,
+		   " backlog -   weight %llu   refcnt %d  min_rate,max_rate %llu,%llu\n",
+		   buff, vq->enabled, 0,
 		   vq->rate, vq->rx_rate, vq->feedback_rate, vq->alpha, (1 << 10),
-		   vq->weight, atomic_read(&vq->refcnt));
+		   vq->weight, atomic_read(&vq->refcnt), vq->conf_min_rate, vq->conf_max_rate);
 
 	for_each_online_cpu(i) {
 		if(first) {

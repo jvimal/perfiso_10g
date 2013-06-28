@@ -515,7 +515,7 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 	iso_class_t vqclass;
 	struct iso_vq *vq;
 	unsigned long flags;
-	int n, ret = 0, rate;
+	int n, ret = 0, min_rate, max_rate, debug;
 	struct iso_rx_context *rxctx;
 	struct net_device *dev = NULL;
 
@@ -523,8 +523,8 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		return -EINVAL;
 
 	rcu_read_lock();
-	n = sscanf(val, "dev %s %s rate %d", _devname, _vqc, &rate);
-	if(n != 3) {
+	n = sscanf(val, "dev %s %s minrate %d maxrate %d %d", _devname, _vqc, &min_rate, &max_rate, &debug);
+	if(n != 5) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -544,25 +544,22 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-	if(rate < 0 || rate > ISO_VQ_DRAIN_RATE_MBPS) {
-		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in [0, %d]\n",
+#define OK(rate) (((rate) > 0 && (rate) < ISO_VQ_DRAIN_RATE_MBPS))
+	if(!OK(min_rate) || !OK(max_rate)) {
+		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in (0, %d]\n",
 		       ISO_VQ_DRAIN_RATE_MBPS);
 		ret = -EINVAL;
 		goto out;
 	}
 
 	spin_lock_irqsave(&rxctx->vq_spinlock, flags);
-	if (rate > 0) {
-		vq->rate = (u64)rate;
-		vq->is_static = 1;
-	} else {
-		vq->is_static = 0;
-		iso_vq_calculate_rates(rxctx);
-	}
+	vq->conf_min_rate = min_rate;
+	vq->conf_max_rate = max_rate;
 	spin_unlock_irqrestore(&rxctx->vq_spinlock, flags);
 
-	printk(KERN_INFO "perfiso: Set rate %d (static? %d) for vq %s on dev %s\n",
-	       rate, vq->is_static, _vqc, _devname);
+	if (debug)
+		printk(KERN_INFO "perfiso: Set minrate %d maxrate %d for vq %s on dev %s\n",
+		       min_rate, max_rate, _vqc, _devname);
  out:
 
 	rcu_read_unlock();
