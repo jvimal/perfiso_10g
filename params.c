@@ -380,7 +380,8 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 	iso_class_t klass;
 	struct iso_tx_class *txc;
 	unsigned long flags;
-	int n, ret = 0, minrate, maxrate, debug;
+	int n, ret = 0, debug;
+	u64 minrate, maxrate;
 	struct net_device *dev = NULL;
 	struct iso_tx_context *txctx;
 
@@ -388,7 +389,7 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 		return -EINVAL;
 
 	rcu_read_lock();
-	n = sscanf(val, "dev %s %s minrate %d maxrate %d %d", _devname, _txc, &minrate, &maxrate, &debug);
+	n = sscanf(val, "dev %s %s minrate %llu maxrate %llu %d", _devname, _txc, &minrate, &maxrate, &debug);
 	if(n != 5) {
 		ret = -EINVAL;
 		goto out;
@@ -409,10 +410,10 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-#define OK_TXC(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE + 20)))
+#define OK_TXC(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE + 1200)))
 	if(!OK_TXC(minrate) || !OK_TXC(maxrate)) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in [1, %d]\n",
-		       ISO_MAX_TX_RATE);
+		       ISO_MAX_TX_RATE + 1200);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -425,7 +426,7 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 	iso_txc_recompute_rates(txctx);
 
 	if (debug)
-		printk(KERN_INFO "perfiso: Set minrate %d maxrate %d for txc %s on dev %s\n",
+		printk(KERN_INFO "perfiso: Set minrate %llu maxrate %llu for txc %s on dev %s\n",
 		       minrate, maxrate, _txc, _devname);
  out:
 
@@ -512,7 +513,8 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 	iso_class_t vqclass;
 	struct iso_vq *vq;
 	unsigned long flags;
-	int n, ret = 0, min_rate, max_rate, debug;
+	int n, ret = 0, debug;
+	u64 minrate, maxrate;
 	struct iso_rx_context *rxctx;
 	struct net_device *dev = NULL;
 
@@ -520,7 +522,7 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		return -EINVAL;
 
 	rcu_read_lock();
-	n = sscanf(val, "dev %s %s minrate %d maxrate %d %d", _devname, _vqc, &min_rate, &max_rate, &debug);
+	n = sscanf(val, "dev %s %s minrate %llu maxrate %llu %d", _devname, _vqc, &min_rate, &max_rate, &debug);
 	if(n != 5) {
 		ret = -EINVAL;
 		goto out;
@@ -541,22 +543,22 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-#define OK(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE+20)))
+#define OK(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE + 1200)))
 	if(!OK(min_rate) || !OK(max_rate)) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in (0, %d]\n",
-		       ISO_VQ_DRAIN_RATE_MBPS);
+		       ISO_MAX_TX_RATE + 1200;
 		ret = -EINVAL;
 		goto out;
 	}
 
 	spin_lock_irqsave(&rxctx->vq_spinlock, flags);
-	vq->conf_min_rate = min_rate;
-	vq->conf_max_rate = max_rate;
+	vq->conf_min_rate = minrate;
+	vq->conf_max_rate = maxrate;
 	spin_unlock_irqrestore(&rxctx->vq_spinlock, flags);
 
 	if (debug)
-		printk(KERN_INFO "perfiso: Set minrate %d maxrate %d for vq %s on dev %s\n",
-		       min_rate, max_rate, _vqc, _devname);
+		printk(KERN_INFO "perfiso: Set minrate %llu maxrate %llu for vq %s on dev %s\n",
+		       minrate, maxrate, _vqc, _devname);
  out:
 
 	rcu_read_unlock();
