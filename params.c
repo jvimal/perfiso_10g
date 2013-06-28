@@ -522,7 +522,7 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 		return -EINVAL;
 
 	rcu_read_lock();
-	n = sscanf(val, "dev %s %s minrate %llu maxrate %llu %d", _devname, _vqc, &min_rate, &max_rate, &debug);
+	n = sscanf(val, "dev %s %s minrate %llu maxrate %llu %d", _devname, _vqc, &minrate, &maxrate, &debug);
 	if(n != 5) {
 		ret = -EINVAL;
 		goto out;
@@ -544,9 +544,9 @@ static int iso_sys_set_vq_rate(const char *val, struct kernel_param *kp) {
 	}
 
 #define OK(rate) (((rate) > 0 && (rate) <= (ISO_MAX_TX_RATE + 1200)))
-	if(!OK(min_rate) || !OK(max_rate)) {
+	if(!OK(minrate) || !OK(maxrate)) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in (0, %d]\n",
-		       ISO_MAX_TX_RATE + 1200;
+		       ISO_MAX_TX_RATE + 1200);
 		ret = -EINVAL;
 		goto out;
 	}
