@@ -409,7 +409,7 @@ static int iso_sys_set_txc_rate(const char *val, struct kernel_param *kp) {
 		goto out;
 	}
 
-	if(rate < 0 || rate > 1024) {
+	if(rate < 0 || rate > ISO_MAX_TX_RATE) {
 		printk(KERN_INFO "perfiso: Invalid rate.  Rate must lie in [1, %d]\n",
 		       ISO_MAX_TX_RATE);
 		ret = -EINVAL;
