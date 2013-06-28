@@ -41,6 +41,9 @@ struct iso_vq *iso_vq_alloc(iso_class_t klass, struct iso_rx_context *rxctx) {
 		iso_vq_init(vq);
 		rcu_read_lock();
 		vq->klass = klass;
+		vq->conf_min_rate = 10;
+		vq->conf_max_rate = ISO_VQ_DRAIN_RATE_MBPS;
+
 		hash = iso_class_hash(klass);
 		head = &rxctx->vq_bucket[hash & (ISO_MAX_VQ_BUCKETS - 1)];
 
