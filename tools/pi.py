@@ -151,7 +151,7 @@ elif args.create_tenant or args.change_tenant:
     if args.rate:
         minrate = args.rate
         if ',' in args.rate:
-            minrate, maxrate = map(int, args.split(',', 1))
+            minrate, maxrate = map(int, args.rate.split(',', 1))
         else:
             minrate = args.rate
             maxrate = None
